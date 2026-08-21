@@ -1,0 +1,259 @@
+[
+  {
+    "id": "E4A4BCA4",
+    "solicitud_num": "4561",
+    "client_name": "prueba312",
+    "activities": [
+      {
+        "id": "act-1",
+        "name": "Fibra Óptica",
+        "description": "Fibra Óptica (1H C/guía Negro / 1H S/guía Negro / 1H S/Blanco / 1H Anti roedores / 4H Redondo)",
+        "detail": "1H C/guía Negro",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-2",
+        "name": "ROSETA OPTICA FTTX 2-PTU",
+        "description": "INV-200-0069 | ROSETA OPTICA FTTX 2-PTU",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-3",
+        "name": "CONECTOR MECANICO SC-APC",
+        "description": "INV-200-0030 | CONECTOR MECANICO SC-APC",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-4",
+        "name": "PATCH CORD FIBRA SM SIMPLEX SC-APC / SC-UPC 1.5MT",
+        "description": "INV-400-0135 | PATCH CORD FIBRA SM SIMPLEX SC-APC / SC-UPC 1.5MT",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-5",
+        "name": "TENSOR FIBRA DROP S/GANCHO TIPO-S",
+        "description": "INV-300-0059 | TENSOR FIBRA DROP S/GANCHO TIPO-S",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-6",
+        "name": "GANCHO DE FIJACION TIPO-S",
+        "description": "INV-300-0031 | GANCHO DE FIJACION TIPO-S",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-7",
+        "name": "PATCH CORD UTP RJ-45 CAT5E 1MT",
+        "description": "INV-400-0157 | PATCH CORD UTP RJ-45 CAT5E 1MT",
+        "detail": "",
+        "checked": true,
+        "unid_mts": "1"
+      },
+      {
+        "id": "act-8",
+        "name": "ETIQUETA SERIALIZADA",
+        "description": "INV-300-0028 | ETIQUETA SERIALIZADA",
+        "detail": "",
+        "checked": true,
+        "unid_mts": "2"
+      },
+      {
+        "id": "act-9",
+        "name": "Equipo ONT",
+        "description": "INV-100-0047 | Equipo ONT",
+        "detail": "",
+        "checked": true,
+        "unid_mts": "3"
+      },
+      {
+        "id": "act-10",
+        "name": "TUBERIA METALICA CORRUGADA",
+        "description": "TUBERIA METALICA CORRUGADA (Indicar diámetro)",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-11",
+        "name": "TUBERIA PLASTICA CORRUGADA",
+        "description": "TUBERIA PLASTICA CORRUGADA (Indicar diámetro)",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-12",
+        "name": "Otro (Indique y Detalle 1)",
+        "description": "Otro (Indique y Detalle)",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-13",
+        "name": "Otro (Indique y Detalle 2)",
+        "description": "Otro (Indique y Detalle)",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      }
+    ],
+    "observations": "",
+    "created_by": "jduran",
+    "created_at": "2026-08-21 15:03:09",
+    "email_status": "No enviado"
+  },
+  {
+    "id": "6A16A167",
+    "solicitud_num": "78945",
+    "client_name": "prueba",
+    "activities": [
+      {
+        "id": "act-1",
+        "name": "Fibra Óptica",
+        "description": "Fibra Óptica (1H C/guía Negro / 1H S/guía Negro / 1H S/Blanco / 1H Anti roedores / 4H Redondo)",
+        "detail": "1H S/Blanco",
+        "checked": true,
+        "unid_mts": "20"
+      },
+      {
+        "id": "act-2",
+        "name": "ROSETA OPTICA FTTX 2-PTU",
+        "description": "INV-200-0069 | ROSETA OPTICA FTTX 2-PTU",
+        "detail": "",
+        "checked": true,
+        "unid_mts": "10"
+      },
+      {
+        "id": "act-3",
+        "name": "CONECTOR MECANICO SC-APC",
+        "description": "INV-200-0030 | CONECTOR MECANICO SC-APC",
+        "detail": "",
+        "checked": true,
+        "unid_mts": "3"
+      },
+      {
+        "id": "act-4",
+        "name": "PATCH CORD FIBRA SM SIMPLEX SC-APC / SC-UPC 1.5MT",
+        "description": "INV-400-0135 | PATCH CORD FIBRA SM SIMPLEX SC-APC / SC-UPC 1.5MT",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-5",
+        "name": "TENSOR FIBRA DROP S/GANCHO TIPO-S",
+        "description": "INV-300-0059 | TENSOR FIBRA DROP S/GANCHO TIPO-S",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-6",
+        "name": "GANCHO DE FIJACION TIPO-S",
+        "description": "INV-300-0031 | GANCHO DE FIJACION TIPO-S",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-7",
+        "name": "PATCH CORD UTP RJ-45 CAT5E 1MT",
+        "description": "INV-400-0157 | PATCH CORD UTP RJ-45 CAT5E 1MT",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-8",
+        "name": "ETIQUETA SERIALIZADA",
+        "description": "INV-300-0028 | ETIQUETA SERIALIZADA",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-9",
+        "name": "Equipo ONT",
+        "description": "INV-100-0047 | Equipo ONT",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-10",
+        "name": "TUBERIA METALICA CORRUGADA",
+        "description": "TUBERIA METALICA CORRUGADA (Indicar diámetro)",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-11",
+        "name": "TUBERIA PLASTICA CORRUGADA",
+        "description": "TUBERIA PLASTICA CORRUGADA (Indicar diámetro)",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-12",
+        "name": "Otro (Indique y Detalle 1)",
+        "description": "Otro (Indique y Detalle)",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      },
+      {
+        "id": "act-13",
+        "name": "Otro (Indique y Detalle 2)",
+        "description": "Otro (Indique y Detalle)",
+        "detail": "",
+        "checked": false,
+        "unid_mts": ""
+      }
+    ],
+    "observations": "",
+    "created_by": "jduran",
+    "created_at": "2026-08-21 15:01:58",
+    "email_status": "Fallido (Sin credenciales Gmail configuradas)"
+  },
+  {
+    "id": "D7A09687",
+    "solicitud_num": "2421299",
+    "client_name": "PERFUMES FACTORY, C.A.",
+    "activities": [
+      {
+        "id": "act-1",
+        "name": "Fibra Óptica",
+        "description": "Fibra Óptica",
+        "detail": "1H C/guía Negro",
+        "checked": true,
+        "unid_mts": "220"
+      },
+      {
+        "id": "act-3",
+        "name": "CONECTOR MECANICO SC-APC",
+        "description": "INV-200-0030 | CONECTOR MECANICO SC-APC",
+        "detail": "",
+        "checked": true,
+        "unid_mts": "2"
+      }
+    ],
+    "observations": "Prueba de instalación completada satisfactoriamente",
+    "created_by": "linfante",
+    "created_at": "2026-08-21 14:34:25",
+    "email_status": "No enviado"
+  }
+]

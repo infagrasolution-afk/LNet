@@ -1,0 +1,62 @@
+[
+  {
+    "id": "8125fbda-7621-4bcc-83f9-fd4d52a5f330",
+    "name": "Luis Infante",
+    "cedula": "18829227",
+    "username": "linfante",
+    "password": "18829227",
+    "role": "admin",
+    "status": "activo",
+    "created_at": "2026-08-21T14:32:08.021852"
+  },
+  {
+    "id": "03c33184-62b1-4bfb-be3e-8677b964c608",
+    "name": "Julio Durán",
+    "cedula": "23950926",
+    "username": "jduran",
+    "password": "23950926",
+    "role": "user",
+    "status": "activo",
+    "created_at": "2026-08-21T14:32:08.021883"
+  },
+  {
+    "id": "25ab86a6-86c1-40d8-822b-065be31ee3e2",
+    "name": "Anthony Vivas",
+    "cedula": "19452382",
+    "username": "avivas",
+    "password": "19452382",
+    "role": "user",
+    "status": "activo",
+    "created_at": "2026-08-21T14:32:08.021890"
+  },
+  {
+    "id": "a1cc6898-0201-4195-bdfa-b927aba6c01d",
+    "name": "Daniel Castro",
+    "cedula": "16544357",
+    "username": "dcastro",
+    "password": "16544357",
+    "role": "user",
+    "status": "activo",
+    "created_at": "2026-08-21T14:32:08.021895"
+  },
+  {
+    "id": "e3214de0-8954-4b30-b01c-0d102cc406bb",
+    "name": "Jefferson Rivas",
+    "cedula": "11691433",
+    "username": "jrivas",
+    "password": "11691433",
+    "role": "user",
+    "status": "activo",
+    "created_at": "2026-08-21T14:32:08.021900"
+  },
+  {
+    "id": "56e645c4-aad5-4450-9bf9-acc7fb6a0cd0",
+    "name": "Luis Betancourt",
+    "cedula": "18816670",
+    "username": "lbetancourt",
+    "password": "18816670",
+    "role": "user",
+    "status": "activo",
+    "created_at": "2026-08-21T14:32:08.021907"
+  }
+]
