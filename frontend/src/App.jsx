@@ -4,6 +4,7 @@ import theme from './theme';
 
 import Login from './components/Login';
 import Navbar from './components/Navbar';
+import DashboardOverview from './components/DashboardOverview';
 import FormSection from './components/FormSection';
 import HistorySection from './components/HistorySection';
 import AdminPanel from './components/AdminPanel';
@@ -14,7 +15,7 @@ const SESSION_USER_KEY = 'lnet_active_session';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('form'); // 'form' | 'history' | 'admin'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'form' | 'history' | 'admin'
 
   useEffect(() => {
     try {
@@ -31,7 +32,7 @@ export default function App() {
     const res = await loginUser(username, password);
     setCurrentUser(res.user);
     sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(res.user));
-    setActiveTab('form');
+    setActiveTab('dashboard');
   };
 
   const handleLogout = () => {
@@ -42,7 +43,15 @@ export default function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'background.default' }}>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: '#070b14',
+          backgroundImage: 'radial-gradient(circle at 50% 0%, rgba(14, 30, 60, 0.45) 0%, rgba(7, 11, 20, 0) 70%)',
+        }}
+      >
         {!currentUser ? (
           <Login onLoginSuccess={handleLogin} />
         ) : (
@@ -54,7 +63,10 @@ export default function App() {
               onLogout={handleLogout}
             />
 
-            <Box sx={{ flexGrow: 1, py: 2 }}>
+            <Box sx={{ flexGrow: 1, pb: 4 }}>
+              {activeTab === 'dashboard' && (
+                <DashboardOverview currentUser={currentUser} onNavigate={setActiveTab} />
+              )}
               {activeTab === 'form' && (
                 <FormSection currentUser={currentUser} onSaveRecord={saveRecord} />
               )}

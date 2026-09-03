@@ -262,12 +262,12 @@ export default function FormSection({ currentUser, onSaveRecord }) {
     <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 4, sm: 6 }, px: { xs: 1.5, sm: 3 } }}>
       <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, borderRadius: { xs: 2, sm: 3 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1.5 }}>
-          <BuildIcon color="primary" sx={{ fontSize: { xs: 28, sm: 32 } }} />
+          <BuildIcon sx={{ color: '#38bdf8', fontSize: { xs: 28, sm: 32 } }} />
           <Box>
-            <Typography variant="h5" color="primary.dark" fontWeight="bold" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#f8fafc', fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
               Formulario de Carga: Ejecución de Actividades
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: '#94a3b8' }}>
               Registre la solicitud y seleccione los materiales/actividades ejecutados
             </Typography>
           </Box>
@@ -310,21 +310,21 @@ export default function FormSection({ currentUser, onSaveRecord }) {
         </Grid>
 
         {/* Section 2: Execution of Activities Table */}
-        <Typography variant="h6" color="primary.main" sx={{ mb: 2, fontWeight: 600 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, color: '#38bdf8' }}>
           EJECUCIÓN DE ACTIVIDADES
         </Typography>
 
-        <TableContainer component={Paper} variant="outlined" sx={{ mb: 4, borderRadius: 2, overflowX: 'auto' }}>
+        <TableContainer component={Paper} variant="outlined" sx={{ mb: 4, borderRadius: 3, overflowX: 'auto', backgroundColor: 'rgba(15, 23, 42, 0.4)' }}>
           <Table size="small" sx={{ minWidth: 550 }}>
-            <TableHead sx={{ backgroundColor: '#0288d1' }}>
+            <TableHead sx={{ backgroundColor: 'rgba(56, 189, 248, 0.12)', borderBottom: '1px solid rgba(56, 189, 248, 0.3)' }}>
               <TableRow>
-                <TableCell align="center" sx={{ color: '#fff', fontWeight: 'bold', width: '60px' }}>
+                <TableCell align="center" sx={{ color: '#38bdf8', fontWeight: 700, width: '60px' }}>
                   Marcar
                 </TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>
+                <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>
                   CODIGO SAP / MATERIAL UTILIZADO
                 </TableCell>
-                <TableCell align="center" sx={{ color: '#fff', fontWeight: 'bold', width: '180px' }}>
+                <TableCell align="center" sx={{ color: '#38bdf8', fontWeight: 700, width: '180px' }}>
                   Unid / MTS
                 </TableCell>
               </TableRow>

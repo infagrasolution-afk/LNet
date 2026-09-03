@@ -196,12 +196,12 @@ export default function AdminPanel() {
       <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, borderRadius: { xs: 2, sm: 3 }, mb: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <AdminPanelSettingsIcon color="primary" sx={{ fontSize: { xs: 28, sm: 32 } }} />
+            <AdminPanelSettingsIcon sx={{ color: '#38bdf8', fontSize: { xs: 28, sm: 32 } }} />
             <Box>
-              <Typography variant="h5" color="primary.dark" fontWeight="bold" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#f8fafc', fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
                 Gestión de Usuarios del Sistema
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{ color: '#94a3b8' }}>
                 Administrar permisos, crear usuarios y bloquear / desbloquear accesos
               </Typography>
             </Box>
@@ -222,21 +222,21 @@ export default function AdminPanel() {
 
         {loadingUsers ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
+            <CircularProgress sx={{ color: '#38bdf8' }} />
           </Box>
         ) : (
-          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflowX: 'auto' }}>
+          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, overflowX: 'auto', backgroundColor: 'rgba(15, 23, 42, 0.4)' }}>
             <Table size="medium" sx={{ minWidth: 600 }}>
-              <TableHead sx={{ backgroundColor: '#0288d1' }}>
+              <TableHead sx={{ backgroundColor: 'rgba(56, 189, 248, 0.12)', borderBottom: '1px solid rgba(56, 189, 248, 0.3)' }}>
                 <TableRow>
-                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Nombre y Apellido</TableCell>
-                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Usuario</TableCell>
-                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Cédula</TableCell>
-                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Rol</TableCell>
-                  <TableCell align="center" sx={{ color: '#fff', fontWeight: 'bold' }}>
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Nombre y Apellido</TableCell>
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Usuario</TableCell>
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Cédula</TableCell>
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Rol</TableCell>
+                  <TableCell align="center" sx={{ color: '#38bdf8', fontWeight: 700 }}>
                     Estado
                   </TableCell>
-                  <TableCell align="center" sx={{ color: '#fff', fontWeight: 'bold' }}>
+                  <TableCell align="center" sx={{ color: '#38bdf8', fontWeight: 700 }}>
                     Acciones
                   </TableCell>
                 </TableRow>
@@ -304,12 +304,12 @@ export default function AdminPanel() {
       {/* Gmail Email SMTP Configuration Section */}
       <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1.5 }}>
-          <EmailIcon color="primary" sx={{ fontSize: 32 }} />
+          <EmailIcon sx={{ color: '#38bdf8', fontSize: 32 }} />
           <Box>
-            <Typography variant="h5" color="primary.dark" fontWeight="bold">
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#f8fafc' }}>
               Configuración del Servicio de Correo Gmail
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: '#94a3b8' }}>
               Establezca las credenciales remitentes de Gmail para el envío automático de reportes
             </Typography>
           </Box>

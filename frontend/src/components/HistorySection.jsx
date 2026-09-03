@@ -80,30 +80,30 @@ function RecordRow({ record, isAdmin }) {
       <TableRow>
         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
           <Collapse in={open} timeout="auto" unmountOnExit>
-            <Box sx={{ margin: 2, p: 2, backgroundColor: '#fafafa', borderRadius: 2, border: '1px solid #e0e0e0' }}>
-              <Typography variant="subtitle2" color="primary.dark" gutterBottom fontWeight="bold">
+            <Box sx={{ margin: 2, p: 2, backgroundColor: 'rgba(15, 23, 42, 0.65)', borderRadius: 3, border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <Typography variant="subtitle2" sx={{ color: '#38bdf8', fontWeight: 700 }} gutterBottom>
                 Detalle de Actividades Ejecutadas ({executedItems.length} materiales/tareas):
               </Typography>
 
               {executedItems.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" sx={{ color: '#94a3b8' }}>
                   No se seleccionaron materiales ni actividades en este registro.
                 </Typography>
               ) : (
-                <Table size="small" sx={{ mb: 2, backgroundColor: '#ffffff' }}>
-                  <TableHead sx={{ backgroundColor: '#eeeeee' }}>
+                <Table size="small" sx={{ mb: 2, backgroundColor: 'rgba(7, 11, 20, 0.4)', borderRadius: 2 }}>
+                  <TableHead sx={{ backgroundColor: 'rgba(56, 189, 248, 0.1)' }}>
                     <TableRow>
-                      <TableCell>Material / Actividad</TableCell>
-                      <TableCell align="center">Detalle / Especificación</TableCell>
-                      <TableCell align="center">Unid / MTS</TableCell>
+                      <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Material / Actividad</TableCell>
+                      <TableCell align="center" sx={{ color: '#38bdf8', fontWeight: 700 }}>Detalle / Especificación</TableCell>
+                      <TableCell align="center" sx={{ color: '#38bdf8', fontWeight: 700 }}>Unid / MTS</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {executedItems.map((act, i) => (
                       <TableRow key={i}>
-                        <TableCell>{act.description || act.name}</TableCell>
-                        <TableCell align="center">{act.detail || '-'}</TableCell>
-                        <TableCell align="center" fontWeight="bold">
+                        <TableCell sx={{ color: '#e2e8f0' }}>{act.description || act.name}</TableCell>
+                        <TableCell align="center" sx={{ color: '#94a3b8' }}>{act.detail || '-'}</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 700, color: '#38bdf8' }}>
                           {act.unid_mts || '1'}
                         </TableCell>
                       </TableRow>
@@ -112,10 +112,10 @@ function RecordRow({ record, isAdmin }) {
                 </Table>
               )}
 
-              <Typography variant="subtitle2" color="primary.dark" gutterBottom fontWeight="bold">
+              <Typography variant="subtitle2" sx={{ color: '#38bdf8', fontWeight: 700 }} gutterBottom>
                 Observaciones Técnicas:
               </Typography>
-              <Typography variant="body2" color="text.primary" sx={{ fontStyle: record.observations ? 'normal' : 'italic' }}>
+              <Typography variant="body2" sx={{ color: '#cbd5e1', fontStyle: record.observations ? 'normal' : 'italic' }}>
                 {record.observations || 'Sin observaciones adicionales.'}
               </Typography>
             </Box>
@@ -173,12 +173,12 @@ export default function HistorySection({ currentUser }) {
       <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, borderRadius: { xs: 2, sm: 3 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <HistoryIcon color="primary" sx={{ fontSize: { xs: 28, sm: 32 } }} />
+            <HistoryIcon sx={{ color: '#38bdf8', fontSize: { xs: 28, sm: 32 } }} />
             <Box>
-              <Typography variant="h5" color="primary.dark" fontWeight="bold" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#f8fafc', fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
                 Historial de Solicitudes Registradas
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{ color: '#94a3b8' }}>
                 {isAdmin
                   ? 'Visualización global de solicitudes y descarga de reportes'
                   : 'Registros generados por tu usuario'}
@@ -192,7 +192,7 @@ export default function HistorySection({ currentUser }) {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
-              startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+              startAdornment: <SearchIcon sx={{ color: '#94a3b8', mr: 1 }} />,
             }}
             sx={{ width: { xs: '100%', sm: 280 } }}
           />
@@ -202,24 +202,24 @@ export default function HistorySection({ currentUser }) {
 
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-            <CircularProgress />
+            <CircularProgress sx={{ color: '#38bdf8' }} />
           </Box>
         ) : filteredRecords.length === 0 ? (
-          <Alert severity="info" sx={{ py: 2 }}>
+          <Alert severity="info" sx={{ py: 2, backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8' }}>
             No se encontraron registros de solicitudes.
           </Alert>
         ) : (
-          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflowX: 'auto' }}>
+          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, overflowX: 'auto', backgroundColor: 'rgba(15, 23, 42, 0.4)' }}>
             <Table sx={{ minWidth: 650 }}>
-              <TableHead sx={{ backgroundColor: '#0288d1' }}>
+              <TableHead sx={{ backgroundColor: 'rgba(56, 189, 248, 0.12)', borderBottom: '1px solid rgba(56, 189, 248, 0.3)' }}>
                 <TableRow>
                   <TableCell sx={{ width: '40px' }} />
-                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Nro. Solicitud</TableCell>
-                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Cliente / Razón Social</TableCell>
-                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Registrado Por</TableCell>
-                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Fecha / Hora</TableCell>
-                  <TableCell align="center" sx={{ color: '#fff', fontWeight: 'bold' }}>
-                    Opciones de Exportación (Excel / PDF)
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Nro. Solicitud</TableCell>
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Cliente / Razón Social</TableCell>
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Registrado Por</TableCell>
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Fecha / Hora</TableCell>
+                  <TableCell align="center" sx={{ color: '#38bdf8', fontWeight: 700 }}>
+                    Reportes
                   </TableCell>
                 </TableRow>
               </TableHead>
