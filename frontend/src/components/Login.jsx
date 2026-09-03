@@ -420,13 +420,27 @@ export default function Login({ onLoginSuccess }) {
         <Typography
           variant="caption"
           sx={{
-            color: 'rgba(255, 255, 255, 0.65)',
+            color: 'rgba(255, 255, 255, 0.75)',
             letterSpacing: 0.5,
             fontSize: '0.78rem',
             textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+            display: 'block',
           }}
         >
           Sistema de Gestión LNet • Red de Telecomunicaciones & Actividades
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            color: 'rgba(255, 255, 255, 0.5)',
+            letterSpacing: 0.6,
+            fontSize: '0.72rem',
+            textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+            display: 'block',
+            mt: 0.3,
+          }}
+        >
+          Elaborado por Infagrasolution
         </Typography>
       </Box>
     </Box>
