@@ -19,7 +19,7 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 const SAVED_CREDS_KEY = 'lnet_remembered_credentials';
 
-export default function Login({ onLoginSuccess }) {
+export default function Login({ onLoginSuccess, sessionMessage }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -197,6 +197,25 @@ export default function Login({ onLoginSuccess }) {
           >
             Login
           </Typography>
+
+          {/* Inactivity / Session Message */}
+          {sessionMessage && (
+            <Fade in={!!sessionMessage}>
+              <Alert
+                severity="warning"
+                sx={{
+                  mb: 2.5,
+                  backgroundColor: 'rgba(217, 119, 6, 0.88)',
+                  color: '#ffffff',
+                  borderRadius: 2,
+                  backdropFilter: 'blur(8px)',
+                  '& .MuiAlert-icon': { color: '#ffffff' },
+                }}
+              >
+                {sessionMessage}
+              </Alert>
+            </Fade>
+          )}
 
           {/* Error Message */}
           {error && (

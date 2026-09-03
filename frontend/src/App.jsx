@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ThemeProvider, CssBaseline, Box } from '@mui/material';
 import theme from './theme';
 
@@ -11,34 +11,67 @@ import AdminPanel from './components/AdminPanel';
 
 import { loginUser, saveRecord } from './services/api';
 
-const SESSION_USER_KEY = 'lnet_active_session';
+// 10 minutes of inactivity limit in milliseconds
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'form' | 'history' | 'admin'
+  const [sessionMessage, setSessionMessage] = useState(null);
+  const inactivityTimerRef = useRef(null);
 
+  // On page load or refresh: always require login (do not restore session)
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem(SESSION_USER_KEY);
-      if (stored) {
-        setCurrentUser(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.error('Failed to parse session user', e);
-    }
+    sessionStorage.clear();
   }, []);
+
+  const handleLogout = (reason = null) => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    setCurrentUser(null);
+    sessionStorage.clear();
+    setSessionMessage(reason);
+  };
 
   const handleLogin = async (username, password) => {
     const res = await loginUser(username, password);
     setCurrentUser(res.user);
-    sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(res.user));
+    setSessionMessage(null);
     setActiveTab('dashboard');
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    sessionStorage.removeItem(SESSION_USER_KEY);
-  };
+  // Inactivity auto-logout tracker (10 minutes)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const resetTimer = () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      inactivityTimerRef.current = setTimeout(() => {
+        handleLogout('Su sesión ha expirado automáticamente por inactividad (10 minutos).');
+      }, INACTIVITY_TIMEOUT_MS);
+    };
+
+    // Events indicating user activity
+    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    activityEvents.forEach((evt) => {
+      window.addEventListener(evt, resetTimer, { passive: true });
+    });
+
+    // Start initial timer
+    resetTimer();
+
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      activityEvents.forEach((evt) => {
+        window.removeEventListener(evt, resetTimer);
+      });
+    };
+  }, [currentUser]);
 
   return (
     <ThemeProvider theme={theme}>
@@ -53,14 +86,14 @@ export default function App() {
         }}
       >
         {!currentUser ? (
-          <Login onLoginSuccess={handleLogin} />
+          <Login onLoginSuccess={handleLogin} sessionMessage={sessionMessage} />
         ) : (
           <>
             <Navbar
               currentUser={currentUser}
               activeTab={activeTab}
               setActiveTab={setActiveTab}
-              onLogout={handleLogout}
+              onLogout={() => handleLogout()}
             />
 
             <Box sx={{ flexGrow: 1, pb: 4 }}>
