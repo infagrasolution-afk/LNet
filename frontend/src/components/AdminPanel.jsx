@@ -46,6 +46,7 @@ import {
   getUsers,
   createUser,
   updateUserStatus,
+  updateUserRole,
   resetPassword,
   deleteUser,
   getSettings,
@@ -105,7 +106,21 @@ export default function AdminPanel() {
       });
       loadData();
     } catch (err) {
-      setToast({ open: true, message: err.message, severity: 'error' });
+      setToast({ open: true, message: err.message || 'Error al actualizar estado', severity: 'error' });
+    }
+  };
+
+  const handleRoleChange = async (user, newRole) => {
+    try {
+      const res = await updateUserRole(user.username, newRole);
+      setToast({
+        open: true,
+        message: res.message || `Rol de ${user.name} cambiado a ${newRole}`,
+        severity: 'success',
+      });
+      setUsers(users.map((u) => (u.id === user.id ? { ...u, role: newRole } : u)));
+    } catch (err) {
+      setToast({ open: true, message: err.message || 'Error al actualizar el rol', severity: 'error' });
     }
   };
 
@@ -252,11 +267,31 @@ export default function AdminPanel() {
                       </TableCell>
                       <TableCell>{u.cedula}</TableCell>
                       <TableCell>
-                        <Chip
-                          label={u.role === 'admin' ? 'Administrador' : 'Usuario'}
-                          color={u.role === 'admin' ? 'secondary' : 'default'}
-                          size="small"
-                        />
+                        {u.username.toLowerCase() === 'linfante' ? (
+                          <Chip
+                            label="Admin Principal"
+                            color="secondary"
+                            size="small"
+                            sx={{ fontWeight: 700 }}
+                          />
+                        ) : (
+                          <FormControl size="small" variant="standard" sx={{ minWidth: 120 }}>
+                            <Select
+                              value={u.role}
+                              onChange={(e) => handleRoleChange(u, e.target.value)}
+                              sx={{
+                                color: u.role === 'admin' ? '#a5b4fc' : '#38bdf8',
+                                fontWeight: 700,
+                                fontSize: '0.85rem',
+                                '&:before': { borderBottomColor: 'rgba(255,255,255,0.15)' },
+                                '&:hover:not(.Mui-disabled):before': { borderBottomColor: '#38bdf8' },
+                              }}
+                            >
+                              <MenuItem value="user">Usuario (Técnico)</MenuItem>
+                              <MenuItem value="admin">Administrador</MenuItem>
+                            </Select>
+                          </FormControl>
+                        )}
                       </TableCell>
                       <TableCell align="center">
                         <Chip
@@ -267,7 +302,7 @@ export default function AdminPanel() {
                         />
                       </TableCell>
                       <TableCell align="center">
-                        {u.role !== 'admin' && (
+                        {u.username.toLowerCase() !== 'linfante' && (
                           <>
                             <Tooltip title={isBlocked ? 'Desbloquear Usuario' : 'Bloquear Usuario'}>
                               <IconButton

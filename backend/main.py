@@ -37,6 +37,9 @@ class UserCreateRequest(BaseModel):
 class UserStatusRequest(BaseModel):
     status: str  # "activo" or "bloqueado"
 
+class UserRoleRequest(BaseModel):
+    role: str  # "admin" or "user"
+
 class SettingsRequest(BaseModel):
     gmail_user: str
     gmail_app_password: str
@@ -166,6 +169,24 @@ def update_user_status(username: str, req: UserStatusRequest):
     user["status"] = req.status
     store.save_users(users)
     return {"message": f"Estado de usuario actualizado a {req.status}", "status": req.status}
+
+@app.put("/api/users/{username}/role")
+def update_user_role(username: str, req: UserRoleRequest):
+    users = store.load_users()
+    user = next((u for u in users if u["username"].lower() == username.lower()), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    if req.role not in ["admin", "user"]:
+        raise HTTPException(status_code=400, detail="Rol inválido. Debe ser 'admin' o 'user'.")
+
+    # Prevent demoting the primary admin
+    if username.lower() == "linfante" and req.role != "admin":
+        raise HTTPException(status_code=400, detail="No se puede cambiar el rol del administrador principal.")
+
+    user["role"] = req.role
+    store.save_users(users)
+    return {"message": f"Rol de {username} actualizado a {req.role}", "role": req.role}
 
 @app.post("/api/users/{username}/reset-password")
 def reset_password(username: str):

@@ -48,6 +48,19 @@ export async function updateUserStatus(username, status) {
   return data;
 }
 
+export async function updateUserRole(username, role) {
+  const res = await fetch(`${API_BASE}/users/${username}/role`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al actualizar rol');
+  }
+  return data;
+}
+
 export async function resetPassword(username) {
   const res = await fetch(`${API_BASE}/users/${username}/reset-password`, {
     method: 'POST',
