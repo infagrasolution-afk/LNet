@@ -8,9 +8,7 @@ import {
   Checkbox,
   Alert,
   CircularProgress,
-  Chip,
   IconButton,
-  Collapse,
   Fade,
 } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
@@ -18,9 +16,6 @@ import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import CloseIcon from '@mui/icons-material/Close';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import PersonIcon from '@mui/icons-material/Person';
-import FlashOnIcon from '@mui/icons-material/FlashOn';
 
 const SAVED_CREDS_KEY = 'lnet_remembered_credentials';
 
@@ -31,7 +26,6 @@ export default function Login({ onLoginSuccess }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showQuickAccess, setShowQuickAccess] = useState(false);
 
   useEffect(() => {
     try {
@@ -74,12 +68,6 @@ export default function Login({ onLoginSuccess }) {
     }
   };
 
-  const handleQuickSelect = (u, p) => {
-    setUsername(u);
-    setPassword(p);
-    setError(null);
-  };
-
   return (
     <Box
       sx={{
@@ -108,19 +96,18 @@ export default function Login({ onLoginSuccess }) {
         }}
       />
 
-      {/* Top Navbar Header matching the reference design */}
+      {/* Top Navbar: Clean Brand Logo */}
       <Box
         sx={{
           position: 'relative',
           zIndex: 2,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
           px: { xs: 2.5, sm: 6, md: 8 },
           py: 3,
         }}
       >
-        {/* Left: Brand / Logo */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box
             component="img"
@@ -145,90 +132,9 @@ export default function Login({ onLoginSuccess }) {
             LNet
           </Typography>
         </Box>
-
-        {/* Right Navigation Links matching reference */}
-        <Box
-          sx={{
-            display: { xs: 'none', md: 'flex' },
-            alignItems: 'center',
-            gap: 4,
-          }}
-        >
-          <Typography
-            variant="body2"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.85)',
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'color 0.2s',
-              '&:hover': { color: '#ffffff' },
-            }}
-          >
-            Inicio
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.85)',
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'color 0.2s',
-              '&:hover': { color: '#ffffff' },
-            }}
-          >
-            Actividades
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.85)',
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'color 0.2s',
-              '&:hover': { color: '#ffffff' },
-            }}
-          >
-            Servicios
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.85)',
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'color 0.2s',
-              '&:hover': { color: '#ffffff' },
-            }}
-          >
-            Contacto
-          </Typography>
-
-          {/* Outlined "Login" pill on top right */}
-          <Button
-            variant="outlined"
-            size="small"
-            sx={{
-              color: '#ffffff',
-              borderColor: 'rgba(255, 255, 255, 0.65)',
-              borderRadius: '20px',
-              px: 3,
-              py: 0.5,
-              textTransform: 'none',
-              fontWeight: 600,
-              backdropFilter: 'blur(8px)',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              '&:hover': {
-                borderColor: '#ffffff',
-                backgroundColor: 'rgba(255, 255, 255, 0.25)',
-              },
-            }}
-          >
-            Login
-          </Button>
-        </Box>
       </Box>
 
-      {/* Center Section: Floating Glassmorphism Modal matching user's image */}
+      {/* Center Section: Floating Glassmorphism Modal */}
       <Box
         sx={{
           position: 'relative',
@@ -256,7 +162,7 @@ export default function Login({ onLoginSuccess }) {
             overflow: 'hidden',
           }}
         >
-          {/* Top-Right Close Button matching reference */}
+          {/* Top-Right Close Button */}
           <IconButton
             size="small"
             onClick={() => setError(null)}
@@ -418,7 +324,7 @@ export default function Login({ onLoginSuccess }) {
               </Box>
             </Box>
 
-            {/* Row: Remember me & Help / Quick Toggle */}
+            {/* Row: Remember me & Help */}
             <Box
               sx={{
                 display: 'flex',
@@ -455,12 +361,11 @@ export default function Login({ onLoginSuccess }) {
 
               <Typography
                 variant="caption"
-                onClick={() => setShowQuickAccess(!showQuickAccess)}
                 sx={{
                   color: 'rgba(255, 255, 255, 0.8)',
                   fontSize: '0.8rem',
                   cursor: 'pointer',
-                  textDecoration: 'none',
+                  userSelect: 'none',
                   '&:hover': {
                     color: '#ffffff',
                     textDecoration: 'underline',
@@ -471,7 +376,7 @@ export default function Login({ onLoginSuccess }) {
               </Typography>
             </Box>
 
-            {/* Pill Submit Button matching reference */}
+            {/* Pill Submit Button */}
             <Button
               type="submit"
               fullWidth
@@ -499,98 +404,6 @@ export default function Login({ onLoginSuccess }) {
               {loading ? <CircularProgress size={22} sx={{ color: '#ffffff' }} /> : 'Login'}
             </Button>
           </Box>
-
-          {/* Bottom Prompt: Don't have an account? / Quick Access */}
-          <Box sx={{ mt: 3, textAlign: 'center' }}>
-            <Typography
-              variant="caption"
-              sx={{ color: 'rgba(255, 255, 255, 0.75)', fontSize: '0.82rem' }}
-            >
-              Acceso rápido para pruebas:{' '}
-              <span
-                onClick={() => setShowQuickAccess(!showQuickAccess)}
-                style={{
-                  color: '#ffffff',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                }}
-              >
-                {showQuickAccess ? 'Ocultar usuarios' : 'Ver usuarios demo'}
-              </span>
-            </Typography>
-          </Box>
-
-          {/* Quick Access Users Collapse */}
-          <Collapse in={showQuickAccess} sx={{ mt: 2 }}>
-            <Box
-              sx={{
-                pt: 1.5,
-                borderTop: '1px solid rgba(255, 255, 255, 0.15)',
-                textAlign: 'center',
-              }}
-            >
-              <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.8)', display: 'block', mb: 1 }}>
-                Selecciona para auto-completar:
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <Chip
-                  icon={<AdminPanelSettingsIcon sx={{ color: '#90caf9 !important', fontSize: 16 }} />}
-                  label="Admin (Luis Infante)"
-                  size="small"
-                  onClick={() => handleQuickSelect('linfante', '18829227')}
-                  sx={{
-                    backgroundColor: 'rgba(25, 118, 210, 0.45)',
-                    color: '#ffffff',
-                    border: '1px solid rgba(144, 202, 249, 0.5)',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    '&:hover': { backgroundColor: 'rgba(25, 118, 210, 0.7)' },
-                  }}
-                />
-                <Chip
-                  icon={<PersonIcon sx={{ color: '#ffffff !important', fontSize: 16 }} />}
-                  label="Julio Durán"
-                  size="small"
-                  onClick={() => handleQuickSelect('jduran', '23950926')}
-                  sx={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.3)' },
-                  }}
-                />
-                <Chip
-                  icon={<PersonIcon sx={{ color: '#ffffff !important', fontSize: 16 }} />}
-                  label="Anthony Vivas"
-                  size="small"
-                  onClick={() => handleQuickSelect('avivas', '19452382')}
-                  sx={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.3)' },
-                  }}
-                />
-                <Chip
-                  icon={<PersonIcon sx={{ color: '#ffffff !important', fontSize: 16 }} />}
-                  label="Daniel Castro"
-                  size="small"
-                  onClick={() => handleQuickSelect('dcastro', '16544357')}
-                  sx={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.3)' },
-                  }}
-                />
-              </Box>
-            </Box>
-          </Collapse>
         </Box>
       </Box>
 
