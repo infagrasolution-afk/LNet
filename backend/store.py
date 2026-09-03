@@ -3,7 +3,10 @@ import json
 import uuid
 from datetime import datetime
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+import shutil
+
+DEFAULT_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+DATA_DIR = os.getenv("DATA_DIR", DEFAULT_DATA_DIR)
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 RECORDS_FILE = os.path.join(DATA_DIR, "records.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
@@ -12,6 +15,17 @@ def ensure_data_dir():
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR, exist_ok=True)
     
+    # If using a separate DATA_DIR (e.g. Render Persistent Disk), copy default files if missing
+    if DATA_DIR != DEFAULT_DATA_DIR and os.path.exists(DEFAULT_DATA_DIR):
+        for fname in ["users.json", "records.json", "settings.json"]:
+            src = os.path.join(DEFAULT_DATA_DIR, fname)
+            dst = os.path.join(DATA_DIR, fname)
+            if os.path.exists(src) and not os.path.exists(dst):
+                try:
+                    shutil.copy2(src, dst)
+                except Exception:
+                    pass
+
     # Initialize users.json if not present
     if not os.path.exists(USERS_FILE):
         default_users = [

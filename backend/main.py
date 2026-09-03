@@ -551,14 +551,28 @@ import os
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+DIST_DIR = os.getenv(
+    "FRONTEND_DIST_DIR",
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+)
+
 if os.path.exists(DIST_DIR):
-    app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
+    assets_dir = os.path.join(DIST_DIR, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
     @app.get("/{full_path:path}")
     async def serve_react_app(full_path: str):
-        if full_path.startswith("api/"):
-            raise HTTPException(status_code=404, detail="API route not found")
+        # Do not intercept API or docs routes
+        if full_path.startswith(("api/", "docs", "redoc", "openapi.json")):
+            raise HTTPException(status_code=404, detail="Route not found")
+        
+        # Check if the requested file exists directly in dist (e.g. favicon.svg, robots.txt)
+        requested_file = os.path.join(DIST_DIR, full_path)
+        if full_path and os.path.isfile(requested_file):
+            return FileResponse(requested_file)
+            
+        # Fallback to index.html for Single Page Application routing
         index_file = os.path.join(DIST_DIR, "index.html")
         if os.path.exists(index_file):
             return FileResponse(index_file)
