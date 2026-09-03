@@ -162,7 +162,7 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <img src="/favicon.svg" alt="LNet" style={{ width: 26, height: 26 }} />
                   <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#ffffff', letterSpacing: 1 }}>
-                    LNet Telecom
+                    LNet
                   </Typography>
                 </Box>
                 <Chip
@@ -179,22 +179,48 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                 />
               </Box>
 
-              {/* Card Number (Cedula / ID) */}
-              <Box sx={{ my: 2.5, position: 'relative', zIndex: 1 }}>
-                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Cédula de Identidad / N° Técnico
-                </Typography>
+              {/* Card Center: Clean Operations & FTTH Badge */}
+              <Box sx={{ my: 3, position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Box
+                    sx={{
+                      width: 38,
+                      height: 28,
+                      borderRadius: 1.2,
+                      border: '1px solid rgba(255, 255, 255, 0.4)',
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.1) 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: 'inset 0 0 4px rgba(255,255,255,0.2)',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 22,
+                        height: 16,
+                        borderRadius: 0.6,
+                        border: '1px solid rgba(255, 255, 255, 0.35)',
+                      }}
+                    />
+                  </Box>
+                  <WifiTetheringIcon sx={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 22 }} />
+                </Box>
                 <Typography
-                  variant="h5"
+                  variant="h6"
                   sx={{
-                    fontWeight: 700,
-                    letterSpacing: 3,
+                    fontWeight: 800,
+                    letterSpacing: 1.2,
                     color: '#ffffff',
-                    fontFamily: 'monospace',
+                    fontFamily: '"Outfit", "Roboto", sans-serif',
                     textShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                    lineHeight: 1.2,
                   }}
                 >
-                  V-{currentUser.cedula || '18829227'}
+                  Operaciones
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.75)', letterSpacing: 0.5 }}>
+
                 </Typography>
               </Box>
 
