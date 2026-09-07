@@ -10,6 +10,7 @@ DATA_DIR = os.getenv("DATA_DIR", DEFAULT_DATA_DIR)
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 RECORDS_FILE = os.path.join(DATA_DIR, "records.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+NOTIFICATIONS_FILE = os.path.join(DATA_DIR, "notifications.json")
 ATTACHMENTS_DIR = os.path.join(DATA_DIR, "attachments")
 
 def ensure_data_dir():
@@ -20,7 +21,7 @@ def ensure_data_dir():
     
     # If using a separate DATA_DIR (e.g. Render Persistent Disk), copy default files if missing
     if DATA_DIR != DEFAULT_DATA_DIR and os.path.exists(DEFAULT_DATA_DIR):
-        for fname in ["users.json", "records.json", "settings.json"]:
+        for fname in ["users.json", "records.json", "settings.json", "notifications.json"]:
             src = os.path.join(DEFAULT_DATA_DIR, fname)
             dst = os.path.join(DATA_DIR, fname)
             if os.path.exists(src) and not os.path.exists(dst):
@@ -159,5 +160,27 @@ def get_attachment_path(record_id: str, filename: str) -> str:
     # Prevent directory traversal attacks
     safe_filename = os.path.basename(filename)
     return os.path.join(ATTACHMENTS_DIR, record_id, safe_filename)
+
+def load_notifications():
+    ensure_data_dir()
+    try:
+        if os.path.exists(NOTIFICATIONS_FILE):
+            with open(NOTIFICATIONS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return []
+
+def save_notifications(notifications):
+    _write_json(NOTIFICATIONS_FILE, notifications)
+
+def add_notification(notification: dict):
+    """Agrega una nueva notificación al inicio y mantiene máximo 100."""
+    notifications = load_notifications()
+    notifications.insert(0, notification)
+    # Keep last 100
+    save_notifications(notifications[:100])
+    return notification
+
 
 

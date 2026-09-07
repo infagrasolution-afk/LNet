@@ -605,6 +605,29 @@ async def create_record(request: Request):
     records.insert(0, record_data)
     store.save_records(records)
 
+    # Lookup technician full name and create in-app notification for administrators
+    users = store.load_users()
+    tech_user = next((u for u in users if u.get("username", "").lower() == created_by.lower()), None)
+    tech_name = tech_user.get("name") if tech_user else created_by
+
+    attach_count = len(saved_attachments)
+    attach_text = f" con {attach_count} evidencia(s)/foto(s)" if attach_count > 0 else ""
+    notif = {
+        "id": str(uuid.uuid4())[:8],
+        "type": "new_record",
+        "title": f"Nueva Solicitud #{solicitud_num}",
+        "message": f"El técnico {tech_name} ({created_by}) cargó la solicitud #{solicitud_num} para '{client_name}'{attach_text}.",
+        "record_id": record_id,
+        "solicitud_num": solicitud_num,
+        "client_name": client_name,
+        "created_by": created_by,
+        "created_by_name": tech_name,
+        "attachments_count": attach_count,
+        "created_at": now_str,
+        "read_by": []
+    }
+    store.add_notification(notif)
+
     res_message = "Registro guardado exitosamente."
     if saved_attachments:
         res_message += f" Se adjuntaron {len(saved_attachments)} archivo(s)/evidencia(s)."
@@ -618,6 +641,36 @@ async def create_record(request: Request):
         "message": res_message,
         "record": record_data
     }
+
+class MarkReadRequest(BaseModel):
+    notification_id: Optional[str] = None
+    username: str
+    mark_all: bool = False
+
+@app.get("/api/notifications")
+def get_notifications():
+    """Retorna la lista de notificaciones recientes para los administradores."""
+    return store.load_notifications()
+
+@app.post("/api/notifications/mark-read")
+def mark_notifications_read(req: MarkReadRequest):
+    """Marca una o todas las notificaciones como leídas por un usuario específico."""
+    notifications = store.load_notifications()
+    username_clean = req.username.strip().lower()
+    for n in notifications:
+        if req.mark_all or n.get("id") == req.notification_id:
+            read_by = n.get("read_by", [])
+            if username_clean not in [u.lower() for u in read_by]:
+                read_by.append(req.username.strip())
+                n["read_by"] = read_by
+    store.save_notifications(notifications)
+    return {"message": "Notificaciones actualizadas con éxito."}
+
+@app.delete("/api/notifications")
+def clear_notifications():
+    """Limpia el historial de notificaciones."""
+    store.save_notifications([])
+    return {"message": "Historial de notificaciones limpiado con éxito."}
 
 @app.post("/api/records/{record_id}/resend")
 def resend_record_email(record_id: str, payload: dict = Body(...)):

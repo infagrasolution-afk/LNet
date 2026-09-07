@@ -189,3 +189,41 @@ export async function resendRecordEmail(recordId, recipientEmail) {
   }
   return data;
 }
+
+export async function getNotifications() {
+  const res = await fetch(`${API_BASE}/notifications`);
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al cargar notificaciones');
+  }
+  return data;
+}
+
+export async function markNotificationsRead(username, notificationId = null, markAll = false) {
+  const res = await fetch(`${API_BASE}/notifications/mark-read`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username,
+      notification_id: notificationId,
+      mark_all: markAll,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al actualizar notificaciones');
+  }
+  return data;
+}
+
+export async function clearNotifications() {
+  const res = await fetch(`${API_BASE}/notifications`, {
+    method: 'DELETE',
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al limpiar notificaciones');
+  }
+  return data;
+}
+
