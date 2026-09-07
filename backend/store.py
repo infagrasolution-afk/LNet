@@ -10,10 +10,13 @@ DATA_DIR = os.getenv("DATA_DIR", DEFAULT_DATA_DIR)
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 RECORDS_FILE = os.path.join(DATA_DIR, "records.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+ATTACHMENTS_DIR = os.path.join(DATA_DIR, "attachments")
 
 def ensure_data_dir():
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR, exist_ok=True)
+    if not os.path.exists(ATTACHMENTS_DIR):
+        os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
     
     # If using a separate DATA_DIR (e.g. Render Persistent Disk), copy default files if missing
     if DATA_DIR != DEFAULT_DATA_DIR and os.path.exists(DEFAULT_DATA_DIR):
@@ -143,4 +146,18 @@ def load_settings():
 
 def save_settings(settings):
     _write_json(SETTINGS_FILE, settings)
+
+def get_record_attachments_dir(record_id: str) -> str:
+    """Retorna la ruta del directorio de adjuntos para un registro y asegura su existencia."""
+    ensure_data_dir()
+    rec_dir = os.path.join(ATTACHMENTS_DIR, record_id)
+    os.makedirs(rec_dir, exist_ok=True)
+    return rec_dir
+
+def get_attachment_path(record_id: str, filename: str) -> str:
+    """Retorna la ruta absoluta de un archivo adjunto."""
+    # Prevent directory traversal attacks
+    safe_filename = os.path.basename(filename)
+    return os.path.join(ATTACHMENTS_DIR, record_id, safe_filename)
+
 

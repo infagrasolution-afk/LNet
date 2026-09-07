@@ -118,17 +118,39 @@ export async function testEmailConnection(recipient) {
   return data;
 }
 
-export async function saveRecord(recordData) {
-  const res = await fetch(`${API_BASE}/records`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(recordData),
-  });
+export async function saveRecord(recordData, files = []) {
+  let res;
+  if (files && files.length > 0) {
+    const formData = new FormData();
+    formData.append('data', JSON.stringify(recordData));
+    files.forEach((file) => {
+      formData.append('files', file);
+    });
+    res = await fetch(`${API_BASE}/records`, {
+      method: 'POST',
+      body: formData,
+    });
+  } else {
+    res = await fetch(`${API_BASE}/records`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(recordData),
+    });
+  }
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.detail || 'Error al guardar registro');
   }
   return data;
+}
+
+export function getAttachmentUrl(path) {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  if (path.startsWith('/api')) {
+    return API_BASE === '/api' ? path : `${API_BASE.replace(/\/api$/, '')}${path}`;
+  }
+  return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
 export async function getRecords(username = null) {

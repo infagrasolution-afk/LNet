@@ -56,6 +56,20 @@ def send_gmail_email(sender_email, app_password, recipient_emails, subject, reco
         activities_html = "<p style='color: #666;'>No se marcaron actividades ejecutadas.</p>"
 
     observaciones = record_data.get("observations", "Sin observaciones registradas.")
+    attachments = record_data.get("attachments", [])
+    attachments_html = ""
+    if attachments:
+        items_li = ""
+        for att in attachments:
+            orig = att.get("original_name", att.get("filename", "Archivo"))
+            size_kb = round(att.get("size", 0) / 1024, 1)
+            items_li += f"<li style='margin-bottom: 4px;'>📎 <strong>{orig}</strong> ({size_kb} KB)</li>"
+        attachments_html = f"""
+        <h3 style="color: #333; border-bottom: 2px solid #1976d2; padding-bottom: 8px; margin-top: 25px;">Archivos y Evidencias Adjuntas</h3>
+        <ul style="padding-left: 20px; font-size: 14px; color: #444;">
+            {items_li}
+        </ul>
+        """
 
     html_content = f"""
     <!DOCTYPE html>
@@ -83,6 +97,8 @@ def send_gmail_email(sender_email, app_password, recipient_emails, subject, reco
                 <div style="background-color: #fafafa; padding: 12px; border-radius: 6px; border: 1px solid #eee; font-size: 14px; white-space: pre-wrap; color: #444;">
                     {observaciones}
                 </div>
+
+                {attachments_html}
             </div>
             <div style="background-color: #f5f5f5; color: #777; padding: 12px; text-align: center; font-size: 12px; border-top: 1px solid #eee;">
                 Correo generado automáticamente por el Sistema LNet.

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Container,
   Paper,
@@ -21,16 +21,24 @@ import {
   Alert,
   Snackbar,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  IconButton,
+  Tooltip,
   Divider,
+  Card,
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import SendIcon from '@mui/icons-material/Send';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import BuildIcon from '@mui/icons-material/Build';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import ImageIcon from '@mui/icons-material/Image';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+
+import CameraCaptureModal from './CameraCaptureModal';
 
 const INITIAL_ACTIVITIES = [
   {
@@ -155,8 +163,10 @@ export default function FormSection({ currentUser, onSaveRecord }) {
   const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
   const [observations, setObservations] = useState('');
 
-  const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const [recipientEmail, setRecipientEmail] = useState('');
+  // Attachments & Camera state
+  const [attachedFiles, setAttachedFiles] = useState([]);
+  const [cameraModalOpen, setCameraModalOpen] = useState(false);
+  const fileInputRef = useRef(null);
 
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
@@ -187,6 +197,80 @@ export default function FormSection({ currentUser, onSaveRecord }) {
     setActivities((prev) =>
       prev.map((act) => (act.id === id ? { ...act, detail: val } : act))
     );
+  };
+
+  // Process selected files (PDF, Excel, Images)
+  const handleFilesSelected = (event) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newItems = Array.from(files).map((file) => {
+      let fileType = 'other';
+      if (file.type.includes('pdf') || file.name.toLowerCase().endsWith('.pdf')) {
+        fileType = 'pdf';
+      } else if (
+        file.type.includes('image') ||
+        file.name.toLowerCase().match(/\.(jpg|jpeg|png|webp|gif|bmp)$/)
+      ) {
+        fileType = 'image';
+      } else if (
+        file.type.includes('excel') ||
+        file.type.includes('spreadsheet') ||
+        file.name.toLowerCase().match(/\.(xlsx|xls|csv)$/)
+      ) {
+        fileType = 'excel';
+      }
+
+      return {
+        id: Math.random().toString(36).substring(2, 9),
+        file: file,
+        name: file.name,
+        size: file.size,
+        type: fileType,
+        previewUrl: fileType === 'image' ? URL.createObjectURL(file) : null,
+      };
+    });
+
+    setAttachedFiles((prev) => [...prev, ...newItems]);
+    // Reset file input value so selecting the same file again triggers onChange
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Add photo captured from camera modal
+  const handlePhotoCaptured = (file) => {
+    const newItem = {
+      id: Math.random().toString(36).substring(2, 9),
+      file: file,
+      name: file.name,
+      size: file.size,
+      type: 'image',
+      previewUrl: URL.createObjectURL(file),
+    };
+    setAttachedFiles((prev) => [...prev, newItem]);
+    setToast({
+      open: true,
+      message: 'Fotografía capturada y adjuntada exitosamente',
+      severity: 'success',
+    });
+  };
+
+  // Remove attached file
+  const handleRemoveAttachedFile = (id) => {
+    setAttachedFiles((prev) => {
+      const target = prev.find((item) => item.id === id);
+      if (target && target.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((item) => item.id !== id);
+    });
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const validateForm = () => {
@@ -234,15 +318,21 @@ export default function FormSection({ currentUser, onSaveRecord }) {
         send_email: false,
       };
 
-      const res = await onSaveRecord(payload);
-      
+      const filesToUpload = attachedFiles.map((a) => a.file);
+      const res = await onSaveRecord(payload, filesToUpload);
+
       setToast({
         open: true,
-        message: 'Solicitud y registro de actividades guardados exitosamente',
+        message:
+          res.message || 'Solicitud y registro de actividades guardados exitosamente.',
         severity: 'success',
       });
 
-      // Reset form
+      // Cleanup object URLs and reset form
+      attachedFiles.forEach((item) => {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      });
+      setAttachedFiles([]);
       setSolicitudNum('');
       setClientName('');
       setObservations('');
@@ -268,7 +358,7 @@ export default function FormSection({ currentUser, onSaveRecord }) {
               Formulario de Carga: Ejecución de Actividades
             </Typography>
             <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-              Registre la solicitud y seleccione los materiales/actividades ejecutados
+              Registre la solicitud, seleccione materiales y adjunte evidencias o fotografías
             </Typography>
           </Box>
         </Box>
@@ -330,7 +420,7 @@ export default function FormSection({ currentUser, onSaveRecord }) {
               </TableRow>
             </TableHead>
             <TableBody>
-              {activities.map((row, index) => (
+              {activities.map((row) => (
                 <TableRow
                   key={row.id}
                   hover
@@ -399,7 +489,7 @@ export default function FormSection({ currentUser, onSaveRecord }) {
         </TableContainer>
 
         {/* Section 3: Observations */}
-        <Typography variant="h6" color="primary.main" sx={{ mb: 1, fontWeight: 600 }}>
+        <Typography variant="h6" sx={{ mb: 1, fontWeight: 700, color: '#38bdf8' }}>
           DETALLES Y OBSERVACIONES
         </Typography>
 
@@ -414,6 +504,199 @@ export default function FormSection({ currentUser, onSaveRecord }) {
           sx={{ mb: 4 }}
         />
 
+        {/* Section 4: Attachments and Camera Capture */}
+        <Box sx={{ mb: 4, p: { xs: 2, sm: 3 }, borderRadius: 3, backgroundColor: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 2 }}>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AttachFileIcon /> Evidencias y Archivos Adjuntos
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                Puede cargar documentos PDF, planillas Excel o capturar fotografías desde la cámara del dispositivo
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.xlsx,.xls,.csv,image/*"
+                style={{ display: 'none' }}
+                onChange={handleFilesSelected}
+              />
+
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<CloudUploadIcon />}
+                onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                sx={{
+                  borderRadius: 2,
+                  borderColor: 'rgba(56, 189, 248, 0.4)',
+                  backgroundColor: 'rgba(56, 189, 248, 0.08)',
+                  color: '#38bdf8',
+                  '&:hover': {
+                    borderColor: '#38bdf8',
+                    backgroundColor: 'rgba(56, 189, 248, 0.18)',
+                  },
+                }}
+              >
+                Cargar Archivo (PDF, Excel, Foto)
+              </Button>
+
+              <Button
+                variant="contained"
+                startIcon={<PhotoCameraIcon />}
+                onClick={() => setCameraModalOpen(true)}
+                sx={{
+                  borderRadius: 2,
+                  background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                  color: '#070b14',
+                  fontWeight: 700,
+                  boxShadow: '0 4px 15px rgba(56, 189, 248, 0.3)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #0369a1 0%, #0284c7 100%)',
+                    color: '#ffffff',
+                  },
+                }}
+              >
+                Tomar Foto
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Attached Files List / Grid */}
+          {attachedFiles.length === 0 ? (
+            <Box
+              sx={{
+                p: 3,
+                textAlign: 'center',
+                border: '1px dashed rgba(255, 255, 255, 0.15)',
+                borderRadius: 2,
+                backgroundColor: 'rgba(7, 11, 20, 0.3)',
+              }}
+            >
+              <Typography variant="body2" sx={{ color: '#64748b' }}>
+                No hay archivos ni fotografías adjuntas. Haga clic en <strong>Cargar Archivo</strong> o <strong>Tomar Foto</strong> para agregar evidencias.
+              </Typography>
+            </Box>
+          ) : (
+            <Grid container spacing={2} sx={{ mt: 0.5 }}>
+              {attachedFiles.map((item) => (
+                <Grid item xs={12} sm={6} md={4} key={item.id}>
+                  <Card
+                    sx={{
+                      p: 1.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: 2,
+                      position: 'relative',
+                    }}
+                  >
+                    {/* Thumbnail or Icon */}
+                    {item.type === 'image' && item.previewUrl ? (
+                      <Box
+                        component="img"
+                        src={item.previewUrl}
+                        alt={item.name}
+                        sx={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 1.5,
+                          objectFit: 'cover',
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                        }}
+                      />
+                    ) : item.type === 'pdf' ? (
+                      <Box
+                        sx={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 1.5,
+                          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                          color: '#ef4444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                        }}
+                      >
+                        <PictureAsPdfIcon sx={{ fontSize: 26 }} />
+                      </Box>
+                    ) : item.type === 'excel' ? (
+                      <Box
+                        sx={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 1.5,
+                          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                          color: '#10b981',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                        }}
+                      >
+                        <TableChartIcon sx={{ fontSize: 26 }} />
+                      </Box>
+                    ) : (
+                      <Box
+                        sx={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 1.5,
+                          backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                          color: '#38bdf8',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                        }}
+                      >
+                        <AttachFileIcon sx={{ fontSize: 26 }} />
+                      </Box>
+                    )}
+
+                    {/* File Information */}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography
+                        variant="body2"
+                        noWrap
+                        sx={{ fontWeight: 600, color: '#f8fafc', fontSize: '0.85rem' }}
+                        title={item.name}
+                      >
+                        {item.name}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                        {formatFileSize(item.size)} • {item.type.toUpperCase()}
+                      </Typography>
+                    </Box>
+
+                    {/* Delete button */}
+                    <Tooltip title="Eliminar archivo">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleRemoveAttachedFile(item.id)}
+                        sx={{
+                          color: '#94a3b8',
+                          '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.15)' },
+                        }}
+                      >
+                        <DeleteOutlineIcon sx={{ fontSize: 20 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+
         {/* Action Buttons */}
         <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
           <Button
@@ -423,11 +706,18 @@ export default function FormSection({ currentUser, onSaveRecord }) {
             startIcon={<SaveIcon />}
             disabled={loading}
             onClick={() => handleSave()}
-            sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: 220, py: 1.2 }}
+            sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: 240, py: 1.3, fontWeight: 700 }}
           >
-            {loading ? <CircularProgress size={26} color="inherit" /> : 'Guardar Registro'}
+            {loading ? <CircularProgress size={26} color="inherit" /> : 'Guardar Registro y Evidencias'}
           </Button>
         </Box>
+
+        {/* Camera Capture Modal */}
+        <CameraCaptureModal
+          open={cameraModalOpen}
+          onClose={() => setCameraModalOpen(false)}
+          onCapture={handlePhotoCaptured}
+        />
 
         {/* Toast Notification */}
         <Snackbar
@@ -444,3 +734,4 @@ export default function FormSection({ currentUser, onSaveRecord }) {
     </Container>
   );
 }
+

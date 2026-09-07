@@ -1,10 +1,13 @@
+import os
 import uuid
 import csv
 import io
+import json
+import mimetypes
 from datetime import datetime
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Depends, Body, Response
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, Depends, Body, Response, Request, UploadFile, File, Form
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -451,6 +454,13 @@ def get_record_pdf(record_id: str):
             {record.get('observations') or 'Sin observaciones registradas.'}
         </div>
 
+        {'''
+        <h3 style="color: #01579b; border-bottom: 2px solid #0288d1; padding-bottom: 6px; margin-top: 30px;">Archivos y Evidencias Adjuntas</h3>
+        <ul style="padding-left: 20px; font-size: 14px; color: #444;">
+        ''' + ''.join([f"<li style='margin-bottom: 4px;'>📎 <strong>{att.get('original_name', att.get('filename'))}</strong> ({round(att.get('size', 0) / 1024, 1)} KB)</li>" for att in record.get('attachments', [])]) + '''
+        </ul>
+        ''' if record.get('attachments') else ''}
+
         <div class="footer">
             Documento de control generado por el Sistema LNet — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         </div>
@@ -466,39 +476,112 @@ def get_record_pdf(record_id: str):
     """
     return HTMLResponse(content=html)
 
+@app.get("/api/attachments/{record_id}/{filename}")
+def get_attachment(record_id: str, filename: str):
+    file_path = store.get_attachment_path(record_id, filename)
+    if not os.path.exists(file_path) or not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Archivo adjunto no encontrado.")
+
+    guessed_type, _ = mimetypes.guess_type(file_path)
+    return FileResponse(
+        path=file_path,
+        media_type=guessed_type or "application/octet-stream",
+        filename=os.path.basename(file_path)
+    )
+
 @app.post("/api/records")
-def create_record(req: RecordCreateRequest):
+async def create_record(request: Request):
+    content_type = request.headers.get("content-type", "")
+    uploaded_files: List[UploadFile] = []
+    
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        data_str = form.get("data")
+        if not data_str:
+            raise HTTPException(status_code=400, detail="Faltan los datos del registro.")
+        try:
+            req_dict = json.loads(data_str)
+        except Exception:
+            raise HTTPException(status_code=400, detail="El campo 'data' no es un JSON válido.")
+        
+        # Extract files from form
+        raw_files = form.getlist("files") or form.getlist("files[]")
+        for f in raw_files:
+            if hasattr(f, "filename") and f.filename:
+                uploaded_files.append(f)
+    else:
+        req_dict = await request.json()
+
+    solicitud_num = str(req_dict.get("solicitud_num", "")).strip()
+    client_name = str(req_dict.get("client_name", "")).strip()
+    activities = req_dict.get("activities", [])
+    observations = req_dict.get("observations", "")
+    created_by = req_dict.get("created_by", "")
+    send_email = bool(req_dict.get("send_email", False))
+    recipient_email = req_dict.get("recipient_email", None)
+
     # Validate numeric solicitud_num
-    if not req.solicitud_num.isdigit():
+    if not solicitud_num.isdigit():
         raise HTTPException(status_code=400, detail="El Nro. de Solicitud solo debe contener caracteres numéricos.")
 
-    if not req.client_name.strip():
+    if not client_name:
         raise HTTPException(status_code=400, detail="El Nombre / Razón Social es obligatorio.")
 
     records = store.load_records()
     record_id = str(uuid.uuid4())[:8].upper()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    # Save uploaded files if any
+    saved_attachments = []
+    if uploaded_files:
+        rec_attach_dir = store.get_record_attachments_dir(record_id)
+        for uf in uploaded_files:
+            try:
+                orig_name = os.path.basename(uf.filename)
+                name_root, ext = os.path.splitext(orig_name)
+                # Clean name root
+                clean_root = "".join(c for c in name_root if c.isalnum() or c in ('_', '-'))[:40] or "archivo"
+                file_uuid = str(uuid.uuid4())[:6]
+                saved_filename = f"{clean_root}_{file_uuid}{ext.lower()}"
+                dest_path = os.path.join(rec_attach_dir, saved_filename)
+
+                content_bytes = await uf.read()
+                with open(dest_path, "wb") as f_out:
+                    f_out.write(content_bytes)
+
+                guessed_content_type, _ = mimetypes.guess_type(orig_name)
+                saved_attachments.append({
+                    "id": file_uuid,
+                    "original_name": orig_name,
+                    "filename": saved_filename,
+                    "size": len(content_bytes),
+                    "content_type": uf.content_type or guessed_content_type or "application/octet-stream",
+                    "url": f"/api/attachments/{record_id}/{saved_filename}"
+                })
+            except Exception as e:
+                print(f"Error saving attachment {uf.filename}: {e}")
+
     email_status = "No enviado"
     email_error = None
 
     record_data = {
         "id": record_id,
-        "solicitud_num": req.solicitud_num.strip(),
-        "client_name": req.client_name.strip(),
-        "activities": [a.dict() for a in req.activities],
-        "observations": req.observations,
-        "created_by": req.created_by,
+        "solicitud_num": solicitud_num,
+        "client_name": client_name,
+        "activities": activities,
+        "observations": observations,
+        "created_by": created_by,
         "created_at": now_str,
-        "email_status": email_status
+        "email_status": email_status,
+        "attachments": saved_attachments
     }
 
-    if req.send_email:
+    if send_email:
         settings = store.load_settings()
         sender = settings.get("gmail_user")
         app_pw = settings.get("gmail_app_password")
 
-        recipients = req.recipient_email if req.recipient_email else settings.get("default_recipients")
+        recipients = recipient_email if recipient_email else settings.get("default_recipients")
 
         if not sender or not app_pw:
             record_data["email_status"] = "Fallido (Sin credenciales Gmail configuradas)"
@@ -506,7 +589,7 @@ def create_record(req: RecordCreateRequest):
             record_data["email_status"] = "Fallido (Sin destinatario de correo)"
         else:
             try:
-                subject = f"[LNet] Ejecución Actividades Solicitud #{req.solicitud_num} - {req.client_name}"
+                subject = f"[LNet] Ejecución Actividades Solicitud #{solicitud_num} - {client_name}"
                 mailer.send_gmail_email(
                     sender_email=sender,
                     app_password=app_pw,
@@ -523,7 +606,9 @@ def create_record(req: RecordCreateRequest):
     store.save_records(records)
 
     res_message = "Registro guardado exitosamente."
-    if req.send_email:
+    if saved_attachments:
+        res_message += f" Se adjuntaron {len(saved_attachments)} archivo(s)/evidencia(s)."
+    if send_email:
         if "Enviado" in record_data["email_status"]:
             res_message += " Correo enviado por Gmail con éxito."
         else:
