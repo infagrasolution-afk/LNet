@@ -2,16 +2,11 @@ services:
   - type: web
     name: lnet
     runtime: docker
-    plan: starter
+    plan: free
     region: oregon
-    disk:
-      name: lnet-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: PORT
         value: 10000
-      - key: DATA_DIR
-        value: /var/data
       - key: PYTHONUNBUFFERED
         value: "1"
+
