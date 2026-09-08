@@ -320,17 +320,17 @@ def _migrate_from_json_and_seed_defaults():
     if cursor.fetchone()["count"] == 0:
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         default_inventory_items = [
-            ("act-1", "INV-FIBRA-01", "Fibra Óptica (1H / 4H Drop)", "Fibra Óptica", "MTS", 2000.0, 300.0),
-            ("act-2", "INV-200-0069", "ROSETA OPTICA FTTX 2-PTU", "Rosetas", "UNID", 100.0, 20.0),
-            ("act-3", "INV-200-0030", "CONECTOR MECANICO SC-APC", "Conectores", "UNID", 250.0, 40.0),
-            ("act-4", "INV-400-0135", "PATCH CORD FIBRA SM SIMPLEX SC-APC / SC-UPC 1.5MT", "Patch Cords", "UNID", 80.0, 15.0),
-            ("act-5", "INV-300-0059", "TENSOR FIBRA DROP S/GANCHO TIPO-S", "Herrajes", "UNID", 150.0, 30.0),
-            ("act-6", "INV-300-0031", "GANCHO DE FIJACION TIPO-S", "Herrajes", "UNID", 150.0, 30.0),
-            ("act-7", "INV-400-0157", "PATCH CORD UTP RJ-45 CAT5E 1MT", "Patch Cords", "UNID", 60.0, 15.0),
-            ("act-8", "INV-300-0028", "ETIQUETA SERIALIZADA", "Identificación", "UNID", 500.0, 100.0),
-            ("act-9", "INV-100-0047", "Equipo ONT", "Equipos Activos", "UNID", 50.0, 10.0),
-            ("act-10", "INV-TUB-CORR-M", "TUBERIA METALICA CORRUGADA", "Tuberías", "MTS", 200.0, 40.0),
-            ("act-11", "INV-TUB-CORR-P", "TUBERIA PLASTICA CORRUGADA", "Tuberías", "MTS", 200.0, 40.0),
+            ("act-1", "INV-FIBRA-01", "Fibra Óptica (1H / 4H Drop)", "Fibra Óptica", "MTS", 0.0, 300.0),
+            ("act-2", "INV-200-0069", "ROSETA OPTICA FTTX 2-PTU", "Rosetas", "UNID", 0.0, 20.0),
+            ("act-3", "INV-200-0030", "CONECTOR MECANICO SC-APC", "Conectores", "UNID", 0.0, 40.0),
+            ("act-4", "INV-400-0135", "PATCH CORD FIBRA SM SIMPLEX SC-APC / SC-UPC 1.5MT", "Patch Cords", "UNID", 0.0, 15.0),
+            ("act-5", "INV-300-0059", "TENSOR FIBRA DROP S/GANCHO TIPO-S", "Herrajes", "UNID", 0.0, 30.0),
+            ("act-6", "INV-300-0031", "GANCHO DE FIJACION TIPO-S", "Herrajes", "UNID", 0.0, 30.0),
+            ("act-7", "INV-400-0157", "PATCH CORD UTP RJ-45 CAT5E 1MT", "Patch Cords", "UNID", 0.0, 15.0),
+            ("act-8", "INV-300-0028", "ETIQUETA SERIALIZADA", "Identificación", "UNID", 0.0, 100.0),
+            ("act-9", "INV-100-0047", "Equipo ONT", "Equipos Activos", "UNID", 0.0, 10.0),
+            ("act-10", "INV-TUB-CORR-M", "TUBERIA METALICA CORRUGADA", "Tuberías", "MTS", 0.0, 40.0),
+            ("act-11", "INV-TUB-CORR-P", "TUBERIA PLASTICA CORRUGADA", "Tuberías", "MTS", 0.0, 40.0),
         ]
 
         for item_id, code, name, cat, unit, initial_stock, min_s in default_inventory_items:
@@ -339,7 +339,7 @@ def _migrate_from_json_and_seed_defaults():
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
             """, (item_id, code, name, cat, unit, initial_stock, min_s, now_str))
 
-            # Registro de movimiento inicial
+            # Registro de movimiento inicial (stock 0)
             cursor.execute("""
                 INSERT INTO inventory_movements (
                     id, item_id, item_code, item_name, movement_type, quantity,
@@ -351,13 +351,13 @@ def _migrate_from_json_and_seed_defaults():
                 code,
                 name,
                 "inicial",
-                initial_stock,
                 0.0,
-                initial_stock,
+                0.0,
+                0.0,
                 "Inventario Inicial",
                 "Sistema",
                 now_str,
-                "Carga de inventario base del sistema"
+                "Catálogo inicial listo para carga de stock por Administrador"
             ))
 
         conn.commit()
