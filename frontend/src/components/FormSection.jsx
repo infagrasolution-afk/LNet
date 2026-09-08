@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Container,
   Paper,
@@ -25,20 +25,25 @@ import {
   Tooltip,
   Divider,
   Card,
+  Chip,
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
-import SendIcon from '@mui/icons-material/Send';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import BuildIcon from '@mui/icons-material/Build';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import TableChartIcon from '@mui/icons-material/TableChart';
-import ImageIcon from '@mui/icons-material/Image';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import RestorePageIcon from '@mui/icons-material/RestorePage';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import CameraCaptureModal from './CameraCaptureModal';
+import SignaturePad from './SignaturePad';
+import { compressImage } from '../utils/imageCompressor';
 
 const INITIAL_ACTIVITIES = [
   {
@@ -155,6 +160,8 @@ const INITIAL_ACTIVITIES = [
   },
 ];
 
+const DRAFT_STORAGE_KEY = 'lnet_form_draft';
+
 export default function FormSection({ currentUser, onSaveRecord }) {
   const [solicitudNum, setSolicitudNum] = useState('');
   const [solicitudError, setSolicitudError] = useState('');
@@ -163,13 +170,72 @@ export default function FormSection({ currentUser, onSaveRecord }) {
   const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
   const [observations, setObservations] = useState('');
 
+  // GPS Geolocation state
+  const [gpsLocation, setGpsLocation] = useState(null);
+  const [capturingGps, setCapturingGps] = useState(false);
+
+  // Digital Signature state
+  const [signatureData, setSignatureData] = useState(null);
+
   // Attachments & Camera state
   const [attachedFiles, setAttachedFiles] = useState([]);
+  const [compressing, setCompressing] = useState(false);
   const [cameraModalOpen, setCameraModalOpen] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Draft banner state
+  const [draftFound, setDraftFound] = useState(null);
+
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+
+  // Check for saved local draft on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.solicitudNum || parsed.clientName || parsed.observations) {
+          setDraftFound(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading form draft:', e);
+    }
+  }, []);
+
+  // Auto-save form draft to localStorage
+  useEffect(() => {
+    if (solicitudNum || clientName || observations) {
+      const draft = {
+        solicitudNum,
+        clientName,
+        observations,
+        activities,
+        gpsLocation,
+        signatureData,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    }
+  }, [solicitudNum, clientName, observations, activities, gpsLocation, signatureData]);
+
+  const handleRestoreDraft = () => {
+    if (!draftFound) return;
+    setSolicitudNum(draftFound.solicitudNum || '');
+    setClientName(draftFound.clientName || '');
+    setObservations(draftFound.observations || '');
+    if (draftFound.activities) setActivities(draftFound.activities);
+    if (draftFound.gpsLocation) setGpsLocation(draftFound.gpsLocation);
+    if (draftFound.signatureData) setSignatureData(draftFound.signatureData);
+    setDraftFound(null);
+    setToast({ open: true, message: 'Borrador restaurado con éxito.', severity: 'info' });
+  };
+
+  const handleDiscardDraft = () => {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    setDraftFound(null);
+  };
 
   const handleSolicitudChange = (e) => {
     const val = e.target.value;
@@ -199,12 +265,53 @@ export default function FormSection({ currentUser, onSaveRecord }) {
     );
   };
 
-  // Process selected files (PDF, Excel, Images)
-  const handleFilesSelected = (event) => {
+  // GPS Geolocation Handler
+  const handleCaptureGps = () => {
+    if (!navigator.geolocation) {
+      setToast({
+        open: true,
+        message: 'La geolocalización no es soportada por este navegador.',
+        severity: 'error',
+      });
+      return;
+    }
+
+    setCapturingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = parseFloat(position.coords.latitude.toFixed(6));
+        const lng = parseFloat(position.coords.longitude.toFixed(6));
+        const accuracy = parseFloat(position.coords.accuracy.toFixed(1));
+
+        setGpsLocation({ lat, lng, accuracy });
+        setCapturingGps(false);
+        setToast({
+          open: true,
+          message: `Ubicación GPS capturada con éxito (±${accuracy}m)`,
+          severity: 'success',
+        });
+      },
+      (error) => {
+        setCapturingGps(false);
+        let msg = 'Error al obtener la ubicación GPS.';
+        if (error.code === 1) msg = 'Permiso de ubicación denegado por el usuario o navegador.';
+        else if (error.code === 2) msg = 'Ubicación no disponible en este momento.';
+        else if (error.code === 3) msg = 'Tiempo de espera agotado al obtener GPS.';
+        setToast({ open: true, message: msg, severity: 'warning' });
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
+  // Process selected files with automatic compression
+  const handleFilesSelected = async (event) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    const newItems = Array.from(files).map((file) => {
+    setCompressing(true);
+    const newItems = [];
+
+    for (const file of Array.from(files)) {
       let fileType = 'other';
       if (file.type.includes('pdf') || file.name.toLowerCase().endsWith('.pdf')) {
         fileType = 'pdf';
@@ -221,37 +328,59 @@ export default function FormSection({ currentUser, onSaveRecord }) {
         fileType = 'excel';
       }
 
-      return {
+      // Comprimir imágenes automáticamente si es tipo image
+      let processedFile = file;
+      if (fileType === 'image') {
+        try {
+          processedFile = await compressImage(file);
+        } catch (e) {
+          console.warn('Error compressing image:', e);
+        }
+      }
+
+      newItems.push({
         id: Math.random().toString(36).substring(2, 9),
-        file: file,
-        name: file.name,
-        size: file.size,
+        file: processedFile,
+        name: processedFile.name,
+        size: processedFile.size,
+        originalSize: file.size,
         type: fileType,
-        previewUrl: fileType === 'image' ? URL.createObjectURL(file) : null,
-      };
-    });
+        previewUrl: fileType === 'image' ? URL.createObjectURL(processedFile) : null,
+      });
+    }
 
     setAttachedFiles((prev) => [...prev, ...newItems]);
-    // Reset file input value so selecting the same file again triggers onChange
+    setCompressing(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  // Add photo captured from camera modal
-  const handlePhotoCaptured = (file) => {
+  // Add photo captured from camera modal with compression
+  const handlePhotoCaptured = async (file) => {
+    setCompressing(true);
+    let processedFile = file;
+    try {
+      processedFile = await compressImage(file);
+    } catch (e) {
+      console.warn('Error compressing camera photo:', e);
+    }
+
     const newItem = {
       id: Math.random().toString(36).substring(2, 9),
-      file: file,
-      name: file.name,
-      size: file.size,
+      file: processedFile,
+      name: processedFile.name,
+      size: processedFile.size,
+      originalSize: file.size,
       type: 'image',
-      previewUrl: URL.createObjectURL(file),
+      previewUrl: URL.createObjectURL(processedFile),
     };
+
     setAttachedFiles((prev) => [...prev, newItem]);
+    setCompressing(false);
     setToast({
       open: true,
-      message: 'Fotografía capturada y adjuntada exitosamente',
+      message: 'Fotografía optimizada y adjuntada exitosamente.',
       severity: 'success',
     });
   };
@@ -268,6 +397,7 @@ export default function FormSection({ currentUser, onSaveRecord }) {
   };
 
   const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -316,6 +446,10 @@ export default function FormSection({ currentUser, onSaveRecord }) {
         observations: observations.trim(),
         created_by: currentUser.username,
         send_email: false,
+        gps_lat: gpsLocation ? gpsLocation.lat : null,
+        gps_lng: gpsLocation ? gpsLocation.lng : null,
+        gps_accuracy: gpsLocation ? gpsLocation.accuracy : null,
+        signature_data: signatureData || null,
       };
 
       const filesToUpload = attachedFiles.map((a) => a.file);
@@ -323,10 +457,12 @@ export default function FormSection({ currentUser, onSaveRecord }) {
 
       setToast({
         open: true,
-        message:
-          res.message || 'Solicitud y registro de actividades guardados exitosamente.',
+        message: res.message || 'Planilla y registro guardados exitosamente.',
         severity: 'success',
       });
+
+      // Limpiar borrador local
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
 
       // Cleanup object URLs and reset form
       attachedFiles.forEach((item) => {
@@ -336,6 +472,8 @@ export default function FormSection({ currentUser, onSaveRecord }) {
       setSolicitudNum('');
       setClientName('');
       setObservations('');
+      setGpsLocation(null);
+      setSignatureData(null);
       setActivities(INITIAL_ACTIVITIES);
     } catch (err) {
       setToast({
@@ -350,6 +488,27 @@ export default function FormSection({ currentUser, onSaveRecord }) {
 
   return (
     <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 4, sm: 6 }, px: { xs: 1.5, sm: 3 } }}>
+      {/* Draft restoration alert */}
+      {draftFound && (
+        <Alert
+          severity="info"
+          icon={<RestorePageIcon />}
+          action={
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button color="inherit" size="small" variant="outlined" onClick={handleRestoreDraft}>
+                Restaurar
+              </Button>
+              <Button color="inherit" size="small" onClick={handleDiscardDraft}>
+                Descartar
+              </Button>
+            </Box>
+          }
+          sx={{ mb: 3, borderRadius: 2 }}
+        >
+          Se encontró un borrador guardado en este dispositivo (Solicitud #{draftFound.solicitudNum || 'S/N'} - {draftFound.clientName || 'Sin cliente'}).
+        </Alert>
+      )}
+
       <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, borderRadius: { xs: 2, sm: 3 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1.5 }}>
           <BuildIcon sx={{ color: '#38bdf8', fontSize: { xs: 28, sm: 32 } }} />
@@ -358,15 +517,15 @@ export default function FormSection({ currentUser, onSaveRecord }) {
               Formulario de Carga: Ejecución de Actividades
             </Typography>
             <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-              Registre la solicitud, seleccione materiales y adjunte evidencias o fotografías
+              Registre la solicitud, materiales utilizados, ubicación GPS, fotos y firma digital
             </Typography>
           </Box>
         </Box>
 
         <Divider sx={{ mb: 4 }} />
 
-        {/* Header Section */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
+        {/* Header Section: Solicitud, Cliente & GPS */}
+        <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid item xs={12} sm={4}>
             <TextField
               required
@@ -399,9 +558,89 @@ export default function FormSection({ currentUser, onSaveRecord }) {
           </Grid>
         </Grid>
 
+        {/* GPS Geolocation Banner Card */}
+        <Box
+          sx={{
+            mb: 4,
+            p: 2,
+            borderRadius: 2.5,
+            backgroundColor: gpsLocation ? 'rgba(16, 185, 129, 0.08)' : 'rgba(15, 23, 42, 0.4)',
+            border: gpsLocation ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 2,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 2,
+                backgroundColor: gpsLocation ? 'rgba(16, 185, 129, 0.2)' : 'rgba(56, 189, 248, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: gpsLocation ? '#10b981' : '#38bdf8',
+              }}
+            >
+              <LocationOnIcon />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc' }}>
+                Ubicación GPS en Terreno
+              </Typography>
+              {gpsLocation ? (
+                <Typography variant="body2" sx={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <CheckCircleIcon sx={{ fontSize: 16 }} /> Coordenadas: {gpsLocation.lat}, {gpsLocation.lng} (±{gpsLocation.accuracy}m)
+                </Typography>
+              ) : (
+                <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                  Registre las coordenadas exactas de la instalación para el reporte oficial
+                </Typography>
+              )}
+            </Box>
+          </Box>
+
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+            {gpsLocation && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="success"
+                startIcon={<OpenInNewIcon />}
+                href={`https://maps.google.com/?q=${gpsLocation.lat},${gpsLocation.lng}`}
+                target="_blank"
+                sx={{ borderRadius: 2, textTransform: 'none' }}
+              >
+                Ver en Google Maps
+              </Button>
+            )}
+
+            <Button
+              variant={gpsLocation ? 'outlined' : 'contained'}
+              color="primary"
+              size="small"
+              startIcon={capturingGps ? <CircularProgress size={16} color="inherit" /> : <MyLocationIcon />}
+              onClick={handleCaptureGps}
+              disabled={capturingGps}
+              sx={{
+                borderRadius: 2,
+                fontWeight: 700,
+                textTransform: 'none',
+                py: 0.8,
+              }}
+            >
+              {capturingGps ? 'Capturando GPS...' : gpsLocation ? 'Actualizar GPS' : 'Capturar Ubicación GPS'}
+            </Button>
+          </Box>
+        </Box>
+
         {/* Section 2: Execution of Activities Table */}
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, color: '#38bdf8' }}>
-          EJECUCIÓN DE ACTIVIDADES
+          EJECUCIÓN DE ACTIVIDADES Y MATERIALES
         </Typography>
 
         <TableContainer component={Paper} variant="outlined" sx={{ mb: 4, borderRadius: 3, overflowX: 'auto', backgroundColor: 'rgba(15, 23, 42, 0.4)' }}>
@@ -504,7 +743,15 @@ export default function FormSection({ currentUser, onSaveRecord }) {
           sx={{ mb: 4 }}
         />
 
-        {/* Section 4: Attachments and Camera Capture */}
+        {/* Section 4: Digital Signature Canvas */}
+        <Box sx={{ mb: 4 }}>
+          <SignaturePad
+            onSignatureChange={setSignatureData}
+            initialSignature={signatureData}
+          />
+        </Box>
+
+        {/* Section 5: Attachments and Camera Capture */}
         <Box sx={{ mb: 4, p: { xs: 2, sm: 3 }, borderRadius: 3, backgroundColor: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 2 }}>
             <Box>
@@ -512,7 +759,7 @@ export default function FormSection({ currentUser, onSaveRecord }) {
                 <AttachFileIcon /> Evidencias y Archivos Adjuntos
               </Typography>
               <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                Puede cargar documentos PDF, planillas Excel o capturar fotografías desde la cámara del dispositivo
+                Cargue documentos PDF, planillas Excel o fotografías (las imágenes se optimizan automáticamente)
               </Typography>
             </Box>
 
@@ -530,20 +777,17 @@ export default function FormSection({ currentUser, onSaveRecord }) {
               <Button
                 variant="outlined"
                 color="primary"
-                startIcon={<CloudUploadIcon />}
+                startIcon={compressing ? <CircularProgress size={16} /> : <CloudUploadIcon />}
+                disabled={compressing}
                 onClick={() => fileInputRef.current && fileInputRef.current.click()}
                 sx={{
                   borderRadius: 2,
                   borderColor: 'rgba(56, 189, 248, 0.4)',
                   backgroundColor: 'rgba(56, 189, 248, 0.08)',
                   color: '#38bdf8',
-                  '&:hover': {
-                    borderColor: '#38bdf8',
-                    backgroundColor: 'rgba(56, 189, 248, 0.18)',
-                  },
                 }}
               >
-                Cargar Archivo (PDF, Excel, Foto)
+                {compressing ? 'Procesando...' : 'Cargar Archivo (PDF, Excel, Foto)'}
               </Button>
 
               <Button
@@ -555,11 +799,6 @@ export default function FormSection({ currentUser, onSaveRecord }) {
                   background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
                   color: '#070b14',
                   fontWeight: 700,
-                  boxShadow: '0 4px 15px rgba(56, 189, 248, 0.3)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #0369a1 0%, #0284c7 100%)',
-                    color: '#ffffff',
-                  },
                 }}
               >
                 Tomar Foto
@@ -598,7 +837,6 @@ export default function FormSection({ currentUser, onSaveRecord }) {
                       position: 'relative',
                     }}
                   >
-                    {/* Thumbnail or Icon */}
                     {item.type === 'image' && item.previewUrl ? (
                       <Box
                         component="img"
@@ -662,7 +900,6 @@ export default function FormSection({ currentUser, onSaveRecord }) {
                       </Box>
                     )}
 
-                    {/* File Information */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography
                         variant="body2"
@@ -674,10 +911,14 @@ export default function FormSection({ currentUser, onSaveRecord }) {
                       </Typography>
                       <Typography variant="caption" sx={{ color: '#94a3b8' }}>
                         {formatFileSize(item.size)} • {item.type.toUpperCase()}
+                        {item.originalSize && item.originalSize > item.size && (
+                          <span style={{ color: '#10b981', marginLeft: '4px' }}>
+                            (Optimizado)
+                          </span>
+                        )}
                       </Typography>
                     </Box>
 
-                    {/* Delete button */}
                     <Tooltip title="Eliminar archivo">
                       <IconButton
                         size="small"
@@ -704,11 +945,11 @@ export default function FormSection({ currentUser, onSaveRecord }) {
             size="large"
             color="primary"
             startIcon={<SaveIcon />}
-            disabled={loading}
+            disabled={loading || compressing}
             onClick={() => handleSave()}
-            sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: 240, py: 1.3, fontWeight: 700 }}
+            sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: 260, py: 1.3, fontWeight: 700 }}
           >
-            {loading ? <CircularProgress size={26} color="inherit" /> : 'Guardar Registro y Evidencias'}
+            {loading ? <CircularProgress size={26} color="inherit" /> : 'Guardar Registro y Descontar Stock'}
           </Button>
         </Box>
 
@@ -734,4 +975,3 @@ export default function FormSection({ currentUser, onSaveRecord }) {
     </Container>
   );
 }
-

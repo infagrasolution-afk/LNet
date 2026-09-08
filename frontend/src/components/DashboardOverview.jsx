@@ -23,18 +23,27 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import InventoryIcon from '@mui/icons-material/Inventory';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
-import { getRecords, downloadRecordsExcel, openRecordPdf } from '../services/api';
+import { getRecords, downloadRecordsExcel, openRecordPdf, getInventory } from '../services/api';
 
 export default function DashboardOverview({ currentUser, onNavigate }) {
   const [records, setRecords] = useState([]);
+  const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const isAdmin = currentUser?.role === 'admin';
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const data = await getRecords();
-      setRecords(data || []);
+      const recordsData = await getRecords();
+      setRecords(recordsData || []);
+      if (isAdmin) {
+        const inventoryData = await getInventory();
+        setInventory(inventoryData || []);
+      }
     } catch (err) {
       console.error('Error fetching records in dashboard:', err);
     } finally {
@@ -44,7 +53,7 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentUser]);
 
   // Compute live metrics from actual records
   const totalRecords = records.length;
@@ -77,6 +86,7 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
     }
   });
 
+  const lowStockCount = inventory.filter((i) => i.stock <= i.min_stock).length;
   const recentRecords = records.slice(0, 4);
 
   return (
@@ -88,14 +98,14 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
             Panel de Operaciones LNet
           </Typography>
           <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-            Control en tiempo real de actividades, telecomunicaciones y despliegue de fibra óptica
+            Control en tiempo real de actividades, telecomunicaciones, GPS e inventario centralizado
           </Typography>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Chip
             icon={<CheckCircleIcon sx={{ fontSize: 16, color: '#10b981 !important' }} />}
-            label="Servidor En Línea"
+            label="Servidor SQLite WAL En Línea"
             size="small"
             sx={{
               backgroundColor: 'rgba(16, 185, 129, 0.12)',
@@ -121,12 +131,12 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
         </Box>
       </Box>
 
-      {/* Main Grid Layout matching user's crypto/fintech dashboard reference */}
+      {/* Main Grid Layout */}
       <Grid container spacing={3}>
-        {/* Left Column: Technician Card & Quick KPIs */}
+        {/* Left Column: Technician Card & Quick KPIs & Inventory widget */}
         <Grid item xs={12} lg={4}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* Glowing Technician Card (matching "VISA" card from reference) */}
+            {/* Glowing Technician Card */}
             <Paper
               elevation={0}
               sx={{
@@ -143,7 +153,6 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                 justifyContent: 'space-between',
               }}
             >
-              {/* Background decorative circles */}
               <Box
                 sx={{
                   position: 'absolute',
@@ -179,124 +188,47 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                 />
               </Box>
 
-              {/* Card Center: Clean Operations & FTTH Badge */}
+              {/* Card Center: Technician Profile Info */}
               <Box sx={{ my: 3, position: 'relative', zIndex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                  <Box
-                    sx={{
-                      width: 38,
-                      height: 28,
-                      borderRadius: 1.2,
-                      border: '1px solid rgba(255, 255, 255, 0.4)',
-                      background: 'linear-gradient(135deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.1) 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: 'inset 0 0 4px rgba(255,255,255,0.2)',
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: 22,
-                        height: 16,
-                        borderRadius: 0.6,
-                        border: '1px solid rgba(255, 255, 255, 0.35)',
-                      }}
-                    />
-                  </Box>
-                  <WifiTetheringIcon sx={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 22 }} />
-                </Box>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 800,
-                    letterSpacing: 1.2,
-                    color: '#ffffff',
-                    fontFamily: '"Outfit", "Roboto", sans-serif',
-                    textShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  Operaciones
+                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.75)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  TÉCNICO EN SESIÓN
                 </Typography>
-                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.75)', letterSpacing: 0.5 }}>
-
+                <Typography variant="h5" sx={{ fontWeight: 800, color: '#ffffff', mt: 0.5 }}>
+                  {currentUser?.name || 'Técnico de Campo'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.85)', fontFamily: 'monospace' }}>
+                  C.I. V-{currentUser?.cedula || 'N/A'} • Rol: {currentUser?.role === 'admin' ? 'Administrador' : 'Técnico de Campo'}
                 </Typography>
               </Box>
 
-              {/* Card Footer: Technician Name & Role */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', zIndex: 1 }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.75)', textTransform: 'uppercase', fontSize: '0.7rem' }}>
-                    Técnico Titular
-                  </Typography>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#ffffff' }}>
-                    {currentUser.name}
-                  </Typography>
-                </Box>
-
-                <Box sx={{ textAlign: 'right' }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.75)', textTransform: 'uppercase', fontSize: '0.7rem' }}>
-                    Rol Asignado
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#ffffff', textTransform: 'capitalize' }}>
-                    {currentUser.role === 'admin' ? 'Administrador' : 'Instalador'}
-                  </Typography>
-                </Box>
+              {/* Card Footer: Quick action */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.75)' }}>
+                  {new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </Typography>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={() => onNavigate('form')}
+                  sx={{
+                    backgroundColor: '#ffffff',
+                    color: '#0369a1',
+                    fontWeight: 700,
+                    fontSize: '0.75rem',
+                    '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.9)' },
+                  }}
+                >
+                  + Cargar Planilla
+                </Button>
               </Box>
             </Paper>
 
-            {/* Quick Action Pill Buttons below card */}
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button
-                fullWidth
-                variant="contained"
-                startIcon={<AssignmentIcon />}
-                onClick={() => onNavigate('form')}
-                sx={{
-                  py: 1.3,
-                  borderRadius: 3,
-                  background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
-                  color: '#070b14',
-                  fontWeight: 700,
-                  boxShadow: '0 8px 25px rgba(56, 189, 248, 0.35)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #0369a1 0%, #0284c7 100%)',
-                    color: '#ffffff',
-                  },
-                }}
-              >
-                Nueva Planilla
-              </Button>
-
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<HistoryIcon />}
-                onClick={() => onNavigate('history')}
-                sx={{
-                  py: 1.3,
-                  borderRadius: 3,
-                  color: '#38bdf8',
-                  borderColor: 'rgba(56, 189, 248, 0.4)',
-                  backgroundColor: 'rgba(56, 189, 248, 0.05)',
-                  fontWeight: 600,
-                  '&:hover': {
-                    borderColor: '#38bdf8',
-                    backgroundColor: 'rgba(56, 189, 248, 0.15)',
-                  },
-                }}
-              >
-                Historial
-              </Button>
-            </Box>
-
-            {/* Quick Stats Panel (matching "Cryptocurrencies Prices" box) */}
+            {/* Quick KPI Summary Card */}
             <Paper
               sx={{
                 p: 3,
                 borderRadius: 4,
-                backgroundColor: '#101726',
+                backgroundColor: 'rgba(15, 23, 42, 0.65)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
               }}
             >
@@ -305,7 +237,7 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
               </Typography>
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {/* Metric Item 1 */}
+                {/* Solicitudes */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, borderRadius: 2, backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                     <Box sx={{ p: 1, borderRadius: 2, backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
@@ -325,7 +257,7 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                   </Typography>
                 </Box>
 
-                {/* Metric Item 2 */}
+                {/* Metros Fibra */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, borderRadius: 2, backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                     <Box sx={{ p: 1, borderRadius: 2, backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
@@ -345,7 +277,7 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                   </Typography>
                 </Box>
 
-                {/* Metric Item 3 */}
+                {/* Actividades */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, borderRadius: 2, backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                     <Box sx={{ p: 1, borderRadius: 2, backgroundColor: 'rgba(129, 140, 248, 0.15)', color: '#818cf8' }}>
@@ -366,13 +298,63 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                 </Box>
               </Box>
             </Paper>
+
+            {/* Inventory Quick Widget for Admins */}
+            {isAdmin && (
+              <Paper
+                sx={{
+                  p: 2.5,
+                  borderRadius: 4,
+                  backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                  border: '1px solid rgba(56, 189, 248, 0.2)',
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <InventoryIcon sx={{ color: '#38bdf8', fontSize: 20 }} />
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc' }}>
+                      Inventario Central
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    variant="text"
+                    color="primary"
+                    onClick={() => onNavigate('inventory')}
+                    sx={{ fontSize: '0.75rem', textTransform: 'none' }}
+                  >
+                    Ver Todo ↗
+                  </Button>
+                </Box>
+
+                <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
+                  <Box sx={{ flex: 1, p: 1.5, borderRadius: 2, backgroundColor: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+                    <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block' }}>
+                      Catálogo
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: '#38bdf8' }}>
+                      {inventory.length} <span style={{ fontSize: '0.75rem' }}>items</span>
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ flex: 1, p: 1.5, borderRadius: 2, backgroundColor: lowStockCount > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.08)', border: lowStockCount > 0 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(16, 185, 129, 0.2)' }}>
+                    <Typography variant="caption" sx={{ color: lowStockCount > 0 ? '#ef4444' : '#10b981', display: 'block' }}>
+                      Alertas Stock
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: lowStockCount > 0 ? '#ef4444' : '#10b981' }}>
+                      {lowStockCount} <span style={{ fontSize: '0.75rem' }}>{lowStockCount > 0 ? 'Bajo' : 'Óptimo'}</span>
+                    </Typography>
+                  </Box>
+                </Box>
+              </Paper>
+            )}
           </Box>
         </Grid>
 
         {/* Right Column: Hero Metrics & Recent Activity */}
         <Grid item xs={12} lg={8}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* Big Hero Card (matching main candlestick / chart card from reference) */}
+            {/* Big Hero Card */}
             <Paper
               sx={{
                 p: { xs: 2.5, sm: 3.5 },
@@ -384,7 +366,6 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                 overflow: 'hidden',
               }}
             >
-              {/* Header */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, flexWrap: 'wrap', gap: 2 }}>
                 <Box>
                   <Typography variant="caption" sx={{ color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -450,12 +431,12 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                         Rosetas Ópticas FTTX
                       </Typography>
                       <Typography variant="body2" sx={{ fontWeight: 700, color: '#10b981' }}>
-                        {totalRosetas} Unid.
+                        {totalRosetas} Unid
                       </Typography>
                     </Box>
                     <LinearProgress
                       variant="determinate"
-                      value={Math.min(100, (totalRosetas / 20) * 100 || 15)}
+                      value={Math.min(100, totalRosetas * 5 || 15)}
                       sx={{
                         height: 8,
                         borderRadius: 4,
@@ -473,21 +454,21 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                   <Box sx={{ p: 2, borderRadius: 3, backgroundColor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-                        Conectores Mecánicos SC-APC
+                        Conectores SC-APC
                       </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#818cf8' }}>
-                        {totalConnectors} Unid.
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#f59e0b' }}>
+                        {totalConnectors} Unid
                       </Typography>
                     </Box>
                     <LinearProgress
                       variant="determinate"
-                      value={Math.min(100, (totalConnectors / 30) * 100 || 25)}
+                      value={Math.min(100, totalConnectors * 3 || 25)}
                       sx={{
                         height: 8,
                         borderRadius: 4,
                         backgroundColor: 'rgba(255, 255, 255, 0.08)',
                         '& .MuiLinearProgress-bar': {
-                          background: 'linear-gradient(90deg, #4f46e5 0%, #818cf8 100%)',
+                          background: 'linear-gradient(90deg, #d97706 0%, #f59e0b 100%)',
                         },
                       }}
                     />
@@ -501,19 +482,19 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                       <Typography variant="body2" sx={{ color: '#94a3b8' }}>
                         Equipos ONT Instalados
                       </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#f59e0b' }}>
-                        {totalONTs} Unid.
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#818cf8' }}>
+                        {totalONTs} Unid
                       </Typography>
                     </Box>
                     <LinearProgress
                       variant="determinate"
-                      value={Math.min(100, (totalONTs / 10) * 100 || 30)}
+                      value={Math.min(100, totalONTs * 10 || 10)}
                       sx={{
                         height: 8,
                         borderRadius: 4,
                         backgroundColor: 'rgba(255, 255, 255, 0.08)',
                         '& .MuiLinearProgress-bar': {
-                          background: 'linear-gradient(90deg, #d97706 0%, #f59e0b 100%)',
+                          background: 'linear-gradient(90deg, #6366f1 0%, #818cf8 100%)',
                         },
                       }}
                     />
@@ -522,119 +503,105 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
               </Grid>
             </Paper>
 
-            {/* Bottom Card: Recent Solicituds Table (matching "Your Assets" from reference) */}
+            {/* Recent Solicitudes / Activity Table */}
             <Paper
               sx={{
-                p: { xs: 2.5, sm: 3.5 },
+                p: { xs: 2.5, sm: 3 },
                 borderRadius: 4,
-                backgroundColor: '#101726',
+                backgroundColor: 'rgba(15, 23, 42, 0.65)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
               }}
             >
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#ffffff' }}>
-                    Últimas Solicitudes Registradas
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                    Actividades más recientes ingresadas en el sistema
-                  </Typography>
-                </Box>
-
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc' }}>
+                  Últimas Solicitudes Registradas
+                </Typography>
                 <Button
                   size="small"
-                  endIcon={<ArrowForwardIosIcon sx={{ fontSize: '12px !important' }} />}
+                  variant="text"
+                  endIcon={<ArrowForwardIosIcon sx={{ fontSize: 12 }} />}
                   onClick={() => onNavigate('history')}
-                  sx={{ color: '#38bdf8', fontWeight: 600, fontSize: '0.85rem' }}
+                  sx={{ color: '#38bdf8', fontWeight: 600, fontSize: '0.8rem' }}
                 >
-                  Ver Todo
+                  Ver Historial Completo
                 </Button>
               </Box>
 
-              {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                  <CircularProgress size={32} sx={{ color: '#38bdf8' }} />
+              {recentRecords.length === 0 ? (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                    No hay solicitudes registradas aún. Haga clic en <strong>+ Cargar Planilla</strong> para comenzar.
+                  </Typography>
                 </Box>
-              ) : recentRecords.length === 0 ? (
-                <Typography variant="body2" sx={{ color: '#64748b', textAlign: 'center', py: 3 }}>
-                  No hay solicitudes registradas aún. Haz clic en "Nueva Planilla" para comenzar.
-                </Typography>
               ) : (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {recentRecords.map((rec) => (
-                    <Box
-                      key={rec.id}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        p: 2,
-                        borderRadius: 3,
-                        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.05)',
-                        transition: 'all 0.2s',
-                        '&:hover': {
-                          backgroundColor: 'rgba(56, 189, 248, 0.05)',
-                          borderColor: 'rgba(56, 189, 248, 0.25)',
-                          transform: 'translateX(4px)',
-                        },
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 2.5,
-                            backgroundColor: 'rgba(56, 189, 248, 0.12)',
-                            color: '#38bdf8',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 700,
-                            fontSize: '0.85rem',
-                          }}
-                        >
-                          #{rec.solicitud_num?.slice(-3) || '001'}
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#f8fafc' }}>
-                            {rec.client_name || 'Sin nombre de cliente'}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                            Solicitud #{rec.solicitud_num} • Por: {rec.created_by}
-                          </Typography>
-                        </Box>
-                      </Box>
-
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Chip
-                          label={rec.email_status && rec.email_status.includes('Enviado') ? 'Correo Enviado' : 'Registrado'}
-                          size="small"
-                          sx={{
-                            backgroundColor:
-                              rec.email_status && rec.email_status.includes('Enviado')
-                                ? 'rgba(16, 185, 129, 0.15)'
-                                : 'rgba(148, 163, 184, 0.15)',
-                            color:
-                              rec.email_status && rec.email_status.includes('Enviado') ? '#34d399' : '#94a3b8',
-                            fontWeight: 600,
-                            fontSize: '0.75rem',
-                          }}
-                        />
-
-                        <Tooltip title="Ver Documento PDF">
-                          <IconButton
+                  {recentRecords.map((rec) => {
+                    const acts = rec.activities ? rec.activities.filter((a) => a.checked) : [];
+                    return (
+                      <Box
+                        key={rec.id}
+                        sx={{
+                          p: 2,
+                          borderRadius: 2.5,
+                          backgroundColor: 'rgba(7, 11, 20, 0.5)',
+                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: 1.5,
+                          transition: 'all 0.2s',
+                          '&:hover': {
+                            backgroundColor: 'rgba(56, 189, 248, 0.05)',
+                            borderColor: 'rgba(56, 189, 248, 0.2)',
+                          },
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Chip
+                            label={`#${rec.solicitud_num}`}
                             size="small"
-                            onClick={() => openRecordPdf(rec.id)}
-                            sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444' } }}
-                          >
-                            <PictureAsPdfIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Tooltip>
+                            sx={{
+                              backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                              color: '#38bdf8',
+                              fontWeight: 700,
+                              fontFamily: 'monospace',
+                            }}
+                          />
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#f8fafc' }}>
+                              {rec.client_name}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                              Técnico: {rec.created_by} • {rec.created_at} • {acts.length} actividades
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Tooltip title="Descargar Excel">
+                            <IconButton
+                              size="small"
+                              onClick={() => downloadRecordsExcel(null, rec.id)}
+                              sx={{ color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}
+                            >
+                              <FileDownloadIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+
+                          <Tooltip title="Ver PDF Oficial">
+                            <IconButton
+                              size="small"
+                              onClick={() => openRecordPdf(rec.id, false)}
+                              sx={{ color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.2)' }}
+                            >
+                              <PictureAsPdfIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                       </Box>
-                    </Box>
-                  ))}
+                    );
+                  })}
                 </Box>
               )}
             </Paper>

@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import DashboardOverview from './components/DashboardOverview';
 import FormSection from './components/FormSection';
 import HistorySection from './components/HistorySection';
+import InventorySection from './components/InventorySection';
 import AdminPanel from './components/AdminPanel';
 
 import { loginUser, saveRecord } from './services/api';
@@ -16,7 +17,7 @@ const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'form' | 'history' | 'admin'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'form' | 'history' | 'inventory' | 'admin'
   const [sessionMessage, setSessionMessage] = useState(null);
   const inactivityTimerRef = useRef(null);
 
@@ -104,6 +105,9 @@ export default function App() {
                 <FormSection currentUser={currentUser} onSaveRecord={saveRecord} />
               )}
               {activeTab === 'history' && <HistorySection currentUser={currentUser} />}
+              {activeTab === 'inventory' && (
+                <InventorySection currentUser={currentUser} />
+              )}
               {activeTab === 'admin' && currentUser.role === 'admin' && <AdminPanel />}
             </Box>
           </>

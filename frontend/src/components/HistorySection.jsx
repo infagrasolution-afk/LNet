@@ -36,6 +36,8 @@ import TableChartIcon from '@mui/icons-material/TableChart';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import DrawIcon from '@mui/icons-material/Draw';
 
 import { getRecords, downloadRecordsExcel, openRecordPdf, getAttachmentUrl } from '../services/api';
 
@@ -68,7 +70,7 @@ function RecordRow({ record, isAdmin }) {
         <TableCell>{record.created_at}</TableCell>
         <TableCell align="center">
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-            <Tooltip title="Descargar esta planilla en formato Excel (.csv)">
+            <Tooltip title="Descargar esta planilla en formato Excel">
               <Button
                 variant="outlined"
                 size="small"
@@ -80,7 +82,7 @@ function RecordRow({ record, isAdmin }) {
               </Button>
             </Tooltip>
 
-            <Tooltip title="Ver / Imprimir Reporte PDF de esta planilla">
+            <Tooltip title="Ver / Imprimir Reporte PDF oficial de esta planilla">
               <Button
                 variant="outlined"
                 size="small"
@@ -99,6 +101,41 @@ function RecordRow({ record, isAdmin }) {
         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box sx={{ margin: 2, p: 2.5, backgroundColor: 'rgba(15, 23, 42, 0.65)', borderRadius: 3, border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              {/* GPS & Signature Indicators */}
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                {record.gps_lat && record.gps_lng && (
+                  <Chip
+                    icon={<LocationOnIcon sx={{ color: '#10b981 !important' }} />}
+                    label={`GPS: ${record.gps_lat}, ${record.gps_lng}${record.gps_accuracy ? ` (±${record.gps_accuracy}m)` : ''}`}
+                    component="a"
+                    href={`https://maps.google.com/?q=${record.gps_lat},${record.gps_lng}`}
+                    target="_blank"
+                    clickable
+                    size="small"
+                    sx={{
+                      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                      color: '#10b981',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      fontWeight: 600,
+                    }}
+                  />
+                )}
+
+                {record.signature_data && (
+                  <Chip
+                    icon={<DrawIcon sx={{ color: '#38bdf8 !important' }} />}
+                    label="Firma de Conformidad Registrada"
+                    size="small"
+                    sx={{
+                      backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                      color: '#38bdf8',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      fontWeight: 600,
+                    }}
+                  />
+                )}
+              </Box>
+
               {/* Materials & Activities */}
               <Typography variant="subtitle2" sx={{ color: '#38bdf8', fontWeight: 700 }} gutterBottom>
                 Detalle de Actividades Ejecutadas ({executedItems.length} materiales/tareas):
@@ -138,6 +175,28 @@ function RecordRow({ record, isAdmin }) {
               <Typography variant="body2" sx={{ color: '#cbd5e1', mb: 3, fontStyle: record.observations ? 'normal' : 'italic' }}>
                 {record.observations || 'Sin observaciones adicionales.'}
               </Typography>
+
+              {/* Digital Signature Box if present */}
+              {record.signature_data && (
+                <Box sx={{ mb: 3, p: 2, backgroundColor: 'rgba(7, 11, 20, 0.5)', borderRadius: 2, border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <Typography variant="subtitle2" sx={{ color: '#38bdf8', fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                    <DrawIcon sx={{ fontSize: 18 }} /> Firma Digital Capturada:
+                  </Typography>
+                  <Box
+                    component="img"
+                    src={record.signature_data}
+                    alt="Firma del cliente"
+                    sx={{
+                      maxHeight: 80,
+                      maxWidth: 240,
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: 1.5,
+                      p: 1,
+                      border: '1px dashed rgba(255, 255, 255, 0.2)',
+                    }}
+                  />
+                </Box>
+              )}
 
               {/* Attachments / Evidences Section */}
               {attachments.length > 0 && (
@@ -251,12 +310,12 @@ function RecordRow({ record, isAdmin }) {
                               >
                                 {att.original_name}
                               </Typography>
-                              <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block' }}>
+                              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
                                 {formatFileSize(att.size)}
                               </Typography>
                             </Box>
 
-                            <Tooltip title={isImg ? 'Ver foto ampliada' : 'Abrir / Descargar archivo'}>
+                            <Tooltip title={isImg ? 'Ver foto ampliada' : 'Descargar archivo'}>
                               <IconButton
                                 size="small"
                                 onClick={() => {
@@ -266,13 +325,9 @@ function RecordRow({ record, isAdmin }) {
                                     window.open(fileUrl, '_blank');
                                   }
                                 }}
-                                sx={{
-                                  color: '#38bdf8',
-                                  backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                                  '&:hover': { backgroundColor: 'rgba(56, 189, 248, 0.25)' },
-                                }}
+                                sx={{ color: '#38bdf8' }}
                               >
-                                {isImg ? <VisibilityIcon sx={{ fontSize: 18 }} /> : <OpenInNewIcon sx={{ fontSize: 18 }} />}
+                                {isImg ? <VisibilityIcon fontSize="small" /> : <OpenInNewIcon fontSize="small" />}
                               </IconButton>
                             </Tooltip>
                           </Card>
@@ -287,34 +342,40 @@ function RecordRow({ record, isAdmin }) {
         </TableCell>
       </TableRow>
 
-      {/* Lightbox Modal for Photo Preview */}
+      {/* Lightbox Dialog for Image Previews */}
       {previewPhoto && (
         <Dialog
           open={Boolean(previewPhoto)}
           onClose={() => setPreviewPhoto(null)}
           maxWidth="md"
+          fullWidth
           PaperProps={{
             sx: {
               backgroundColor: '#0f172a',
               borderRadius: 3,
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              overflow: 'hidden',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
             },
           }}
         >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#ffffff' }}>
-              {previewPhoto.title}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+            <Typography variant="subtitle1" sx={{ color: '#f8fafc', fontWeight: 700 }} noWrap>
+              📷 {previewPhoto.title}
             </Typography>
             <IconButton onClick={() => setPreviewPhoto(null)} sx={{ color: '#94a3b8' }}>
               <CloseIcon />
             </IconButton>
           </Box>
-          <DialogContent sx={{ p: 1, display: 'flex', justifyContent: 'center', backgroundColor: '#000000' }}>
-            <img
+          <DialogContent sx={{ textAlign: 'center', p: 2, backgroundColor: '#070b14' }}>
+            <Box
+              component="img"
               src={previewPhoto.url}
               alt={previewPhoto.title}
-              style={{ maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain' }}
+              sx={{
+                maxWidth: '100%',
+                maxHeight: '75vh',
+                borderRadius: 2,
+                objectFit: 'contain',
+              }}
             />
           </DialogContent>
         </Dialog>
@@ -328,35 +389,24 @@ export default function HistorySection({ currentUser }) {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
-  const isAdmin = currentUser?.role === 'admin';
 
-  const loadHistory = async () => {
+  const isAdmin = currentUser.role === 'admin';
+
+  const loadRecordsData = async () => {
     setLoading(true);
     try {
-      // Regular user sees only their records; Admin sees all records
-      const targetUser = isAdmin ? null : currentUser.username;
-      const data = await getRecords(targetUser);
+      const data = await getRecords(isAdmin ? null : currentUser.username);
       setRecords(data);
     } catch (err) {
-      setToast({ open: true, message: err.message || 'Error al cargar el historial', severity: 'error' });
+      setToast({ open: true, message: err.message || 'Error al cargar registros', severity: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadHistory();
+    loadRecordsData();
   }, [currentUser]);
-
-  const handleExportExcel = () => {
-    try {
-      const targetUser = isAdmin ? null : currentUser.username;
-      downloadRecordsExcel(targetUser);
-      setToast({ open: true, message: 'Descargando reporte en formato Excel (.csv)...', severity: 'info' });
-    } catch (err) {
-      setToast({ open: true, message: 'Error al descargar archivo Excel', severity: 'error' });
-    }
-  };
 
   const filteredRecords = records.filter(
     (r) =>
@@ -368,79 +418,92 @@ export default function HistorySection({ currentUser }) {
   return (
     <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 4, sm: 6 }, px: { xs: 1.5, sm: 3 } }}>
       <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, borderRadius: { xs: 2, sm: 3 } }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <HistoryIcon sx={{ color: '#38bdf8', fontSize: { xs: 28, sm: 32 } }} />
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 800, color: '#f8fafc', fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
-                Historial de Solicitudes Registradas
+                Historial de Solicitudes y Actividades
               </Typography>
               <Typography variant="body2" sx={{ color: '#94a3b8' }}>
                 {isAdmin
-                  ? 'Visualización global de solicitudes y descarga de reportes'
-                  : 'Registros generados por tu usuario'}
+                  ? 'Visualización general de todos los registros de campo de la empresa'
+                  : `Planillas cargadas por el técnico: ${currentUser.name}`}
               </Typography>
             </Box>
           </Box>
 
+          <Button
+            variant="contained"
+            color="success"
+            startIcon={<FileDownloadIcon />}
+            onClick={() => downloadRecordsExcel(isAdmin ? null : currentUser.username)}
+            disabled={records.length === 0}
+            sx={{ fontWeight: 700 }}
+          >
+            Exportar Todo a Excel
+          </Button>
+        </Box>
+
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Search filter bar */}
+        <Box sx={{ mb: 3 }}>
           <TextField
+            fullWidth
             size="small"
-            placeholder="Buscar por Nro, Cliente o Usuario..."
+            placeholder="Buscar por Nro. de Solicitud, Cliente o Técnico..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
               startAdornment: <SearchIcon sx={{ color: '#94a3b8', mr: 1 }} />,
             }}
-            sx={{ width: { xs: '100%', sm: 280 } }}
           />
         </Box>
 
-        <Divider sx={{ mb: 3 }} />
-
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-            <CircularProgress sx={{ color: '#38bdf8' }} />
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress />
           </Box>
         ) : filteredRecords.length === 0 ? (
-          <Alert severity="info" sx={{ py: 2, backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8' }}>
-            No se encontraron registros de solicitudes.
-          </Alert>
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="body1" sx={{ color: '#94a3b8' }}>
+              No se encontraron registros de actividades.
+            </Typography>
+          </Box>
         ) : (
-          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, overflowX: 'auto', backgroundColor: 'rgba(15, 23, 42, 0.4)' }}>
-            <Table sx={{ minWidth: 650 }}>
-              <TableHead sx={{ backgroundColor: 'rgba(56, 189, 248, 0.12)', borderBottom: '1px solid rgba(56, 189, 248, 0.3)' }}>
+          <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+            <Table size="small">
+              <TableHead sx={{ backgroundColor: 'rgba(56, 189, 248, 0.1)' }}>
                 <TableRow>
-                  <TableCell sx={{ width: '40px' }} />
-                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Nro. Solicitud</TableCell>
-                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Cliente / Razón Social</TableCell>
-                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Registrado Por</TableCell>
-                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>Fecha / Hora</TableCell>
-                  <TableCell align="center" sx={{ color: '#38bdf8', fontWeight: 700 }}>
-                    Reportes
-                  </TableCell>
+                  <TableCell style={{ width: '40px' }} />
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>SOLICITUD</TableCell>
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>CLIENTE / RAZÓN SOCIAL</TableCell>
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>TÉCNICO</TableCell>
+                  <TableCell sx={{ color: '#38bdf8', fontWeight: 700 }}>FECHA / HORA</TableCell>
+                  <TableCell align="center" sx={{ color: '#38bdf8', fontWeight: 700 }}>REPORTES</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredRecords.map((r) => (
-                  <RecordRow key={r.id} record={r} isAdmin={isAdmin} />
+                {filteredRecords.map((rec) => (
+                  <RecordRow key={rec.id} record={rec} isAdmin={isAdmin} />
                 ))}
               </TableBody>
             </Table>
           </TableContainer>
         )}
-      </Paper>
 
-      {/* Toast Notification */}
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={6000}
-        onClose={() => setToast({ ...toast, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity={toast.severity} sx={{ width: '100%' }}>
-          {toast.message}
-        </Alert>
-      </Snackbar>
+        <Snackbar
+          open={toast.open}
+          autoHideDuration={6000}
+          onClose={() => setToast({ ...toast, open: false })}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert severity={toast.severity} sx={{ width: '100%' }}>
+            {toast.message}
+          </Alert>
+        </Snackbar>
+      </Paper>
     </Container>
   );
 }

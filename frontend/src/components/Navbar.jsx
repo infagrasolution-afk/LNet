@@ -29,6 +29,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import HistoryIcon from '@mui/icons-material/History';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import InventoryIcon from '@mui/icons-material/Inventory';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import NotificationsIcon from '@mui/icons-material/Notifications';
@@ -71,6 +72,11 @@ export default function Navbar({ currentUser, activeTab, setActiveTab, onLogout 
   ];
 
   if (isAdmin) {
+    navItems.push({
+      id: 'inventory',
+      label: 'Inventario',
+      icon: <InventoryIcon sx={{ fontSize: 18 }} />,
+    });
     navItems.push({
       id: 'admin',
       label: 'Administración',

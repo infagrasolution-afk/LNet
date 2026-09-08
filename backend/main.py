@@ -5,7 +5,7 @@ import io
 import json
 import mimetypes
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Depends, Body, Response, Request, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -67,12 +67,46 @@ class RecordCreateRequest(BaseModel):
     created_by: str
     send_email: bool = False
     recipient_email: Optional[str] = None
+    gps_lat: Optional[float] = None
+    gps_lng: Optional[float] = None
+    gps_accuracy: Optional[float] = None
+    signature_data: Optional[str] = None
+
+class InventoryItemCreateRequest(BaseModel):
+    code: str
+    name: str
+    category: Optional[str] = "General"
+    unit: Optional[str] = "UNID"
+    stock: Optional[float] = 0.0
+    min_stock: Optional[float] = 5.0
+
+class InventoryItemUpdateRequest(BaseModel):
+    name: str
+    category: Optional[str] = "General"
+    unit: Optional[str] = "UNID"
+    min_stock: Optional[float] = 5.0
+
+class InventoryAdjustRequest(BaseModel):
+    item_id: str
+    quantity_delta: float
+    movement_type: Optional[str] = "ajuste"  # 'ingreso_manual', 'ajuste', 'salida'
+    reference: Optional[str] = "Ajuste manual"
+    created_by: Optional[str] = "Admin"
+    notes: Optional[str] = ""
+
+class MarkReadRequest(BaseModel):
+    notification_id: Optional[str] = None
+    username: str
+    mark_all: bool = False
 
 @app.on_event("startup")
 def startup_event():
     store.ensure_data_dir()
 
-# Auth Endpoint
+# ==========================================
+# AUTH ENDPOINTS
+# ==========================================
+
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
     users = store.load_users()
@@ -103,7 +137,10 @@ def login(req: LoginRequest):
         }
     }
 
-# Admin User Management Endpoints
+# ==========================================
+# ADMIN USER MANAGEMENT
+# ==========================================
+
 @app.get("/api/users")
 def get_users():
     users = store.load_users()
@@ -216,7 +253,10 @@ def delete_user(username: str):
     store.save_users(filtered_users)
     return {"message": f"Usuario {username} eliminado exitosamente."}
 
-# Settings Endpoints
+# ==========================================
+# SETTINGS & EMAIL ENDPOINTS
+# ==========================================
+
 @app.get("/api/settings")
 def get_settings():
     return store.load_settings()
@@ -266,13 +306,70 @@ def test_email(req: TestEmailRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al enviar correo por Gmail: {str(e)}")
 
-# Records Form Endpoints
+# ==========================================
+# INVENTARIO CENTRALIZADO ENDPOINTS
+# ==========================================
+
+@app.get("/api/inventory")
+def get_inventory():
+    """Retorna el catálogo y stock actual de todos los materiales."""
+    return store.get_inventory()
+
+@app.post("/api/inventory/items")
+def create_inventory_item(req: InventoryItemCreateRequest):
+    """Agrega un nuevo producto al inventario."""
+    try:
+        item = store.add_inventory_item(req.dict())
+        return {"message": "Producto agregado al inventario exitosamente.", "item": item}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al crear producto: {str(e)}")
+
+@app.put("/api/inventory/items/{item_id}")
+def update_inventory_item(item_id: str, req: InventoryItemUpdateRequest):
+    """Actualiza la información descriptiva de un producto."""
+    try:
+        res = store.update_inventory_item(item_id, req.dict())
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al actualizar producto: {str(e)}")
+
+@app.delete("/api/inventory/items/{item_id}")
+def delete_inventory_item(item_id: str):
+    """Elimina un producto del catálogo de inventario."""
+    try:
+        store.delete_inventory_item(item_id)
+        return {"message": "Producto eliminado del inventario exitosamente."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al eliminar producto: {str(e)}")
+
+@app.post("/api/inventory/adjust")
+def adjust_inventory_stock(req: InventoryAdjustRequest):
+    """Ajusta o repone stock de un material y registra la auditoría."""
+    try:
+        res = store.adjust_inventory_stock(
+            item_id=req.item_id,
+            quantity_delta=req.quantity_delta,
+            movement_type=req.movement_type or "ajuste",
+            reference=req.reference or "Ajuste manual",
+            created_by=req.created_by or "Admin",
+            notes=req.notes or ""
+        )
+        return {"message": "Stock actualizado con éxito.", "data": res}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al ajustar stock: {str(e)}")
+
+@app.get("/api/inventory/movements")
+def get_inventory_movements(limit: int = 150):
+    """Retorna los últimos movimientos del historial de auditoría de inventario."""
+    return store.get_inventory_movements(limit=limit)
+
+# ==========================================
+# RECORDS / PLANILLAS ENDPOINTS
+# ==========================================
+
 @app.get("/api/records")
 def get_records(username: Optional[str] = None):
-    records = store.load_records()
-    if username:
-        return [r for r in records if r.get("created_by", "").lower() == username.lower()]
-    return records
+    return store.load_records(username=username)
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -280,11 +377,9 @@ from openpyxl.utils import get_column_letter
 
 @app.get("/api/records/export/excel")
 def export_records_excel(username: Optional[str] = None, record_id: Optional[str] = None):
-    records = store.load_records()
+    records = store.load_records(username=username)
     if record_id:
         records = [r for r in records if r.get("id") == record_id]
-    elif username:
-        records = [r for r in records if r.get("created_by", "").lower() == username.lower()]
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -308,6 +403,7 @@ def export_records_excel(username: Optional[str] = None, record_id: Optional[str
         "Registrado Por",
         "Fecha / Hora",
         "Materiales / Actividades Ejecutadas",
+        "Ubicación GPS",
         "Observaciones"
     ]
     ws.append(headers)
@@ -328,6 +424,8 @@ def export_records_excel(username: Optional[str] = None, record_id: Optional[str
             for a in r.get("activities", []) if a.get("checked")
         ]
         acts_str = "\n".join(executed_acts) if executed_acts else "Sin materiales marcados"
+        
+        gps_str = f"Lat: {r.get('gps_lat')}, Lng: {r.get('gps_lng')}" if r.get("gps_lat") else "No capturado"
 
         row_data = [
             r.get("solicitud_num", ""),
@@ -335,6 +433,7 @@ def export_records_excel(username: Optional[str] = None, record_id: Optional[str
             r.get("created_by", ""),
             r.get("created_at", ""),
             acts_str,
+            gps_str,
             r.get("observations", "")
         ]
         ws.append(row_data)
@@ -345,7 +444,8 @@ def export_records_excel(username: Optional[str] = None, record_id: Optional[str
         ws.cell(row=row_idx, column=3).alignment = center_align
         ws.cell(row=row_idx, column=4).alignment = center_align
         ws.cell(row=row_idx, column=5).alignment = left_align
-        ws.cell(row=row_idx, column=6).alignment = left_align
+        ws.cell(row=row_idx, column=6).alignment = center_align
+        ws.cell(row=row_idx, column=7).alignment = left_align
 
         for col_num in range(1, len(headers) + 1):
             ws.cell(row=row_idx, column=col_num).border = thin_border
@@ -353,7 +453,7 @@ def export_records_excel(username: Optional[str] = None, record_id: Optional[str
         ws.row_dimensions[row_idx].height = max(30, len(executed_acts) * 18)
 
     # Auto-adjust column widths
-    column_widths = {1: 16, 2: 30, 3: 16, 4: 22, 5: 50, 6: 35}
+    column_widths = {1: 16, 2: 30, 3: 16, 4: 22, 5: 50, 6: 25, 7: 35}
     for col_num, width in column_widths.items():
         ws.column_dimensions[get_column_letter(col_num)].width = width
 
@@ -393,8 +493,37 @@ def get_record_pdf(record_id: str):
         <tr>
             <td style="padding: 10px; border-bottom: 1px solid #e0e0e0;">{material_name}</td>
             <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; text-align: center; color: #2e7d32; font-weight: bold;">✔ Ejecutado</td>
-            <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; text-align: center;">{qty}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; text-align: center; font-weight: bold;">{qty}</td>
         </tr>
+        """
+
+    # GPS info section
+    gps_html = ""
+    if record.get("gps_lat") and record.get("gps_lng"):
+        lat = record.get("gps_lat")
+        lng = record.get("gps_lng")
+        acc = round(record.get("gps_accuracy", 0), 1) if record.get("gps_accuracy") else ""
+        acc_text = f" (Precisión: ±{acc}m)" if acc else ""
+        maps_url = f"https://maps.google.com/?q={lat},{lng}"
+        gps_html = f"""
+        <div style="margin-top: 15px; padding: 10px 15px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 6px; font-size: 14px;">
+            📍 <strong>Ubicación GPS en Terreno:</strong> {lat}, {lng}{acc_text}
+            — <a href="{maps_url}" target="_blank" style="color: #2e7d32; font-weight: bold; text-decoration: underline;">Abrir en Google Maps ↗</a>
+        </div>
+        """
+
+    # Digital signature section
+    signature_html = ""
+    if record.get("signature_data"):
+        signature_html = f"""
+        <h3 style="color: #01579b; border-bottom: 2px solid #0288d1; padding-bottom: 6px; margin-top: 30px;">Firma de Conformidad del Cliente / Técnico</h3>
+        <div style="display: flex; align-items: center; gap: 20px; margin-top: 10px; padding: 15px; background: #fafafa; border: 1px dashed #bdbdbd; border-radius: 8px; width: fit-content;">
+            <img src="{record.get('signature_data')}" alt="Firma Digital" style="max-height: 90px; max-width: 260px; object-fit: contain; border-bottom: 2px solid #333;" />
+            <div style="font-size: 13px; color: #555;">
+                <p style="margin: 0 0 4px 0;"><strong>Conformidad del Servicio Realizado</strong></p>
+                <p style="margin: 0; color: #777;">Firma registrada digitalmente en dispositivo móvil.</p>
+            </div>
+        </div>
         """
 
     html = f"""
@@ -433,6 +562,7 @@ def get_record_pdf(record_id: str):
             <p style="margin: 4px 0;"><strong>Nro. Solicitud:</strong> #{record.get('solicitud_num')}</p>
             <p style="margin: 4px 0;"><strong>Cliente / Razón Social:</strong> {record.get('client_name')}</p>
             <p style="margin: 4px 0;"><strong>Registrado Por:</strong> {record.get('created_by')} | <strong>Fecha:</strong> {record.get('created_at')}</p>
+            {gps_html}
         </div>
 
         <h3 style="color: #01579b; border-bottom: 2px solid #0288d1; padding-bottom: 6px;">Materiales y Actividades Ejecutadas</h3>
@@ -453,6 +583,8 @@ def get_record_pdf(record_id: str):
         <div style="background: #fafafa; border: 1px solid #e0e0e0; padding: 15px; border-radius: 6px; min-height: 60px;">
             {record.get('observations') or 'Sin observaciones registradas.'}
         </div>
+
+        {signature_html}
 
         {'''
         <h3 style="color: #01579b; border-bottom: 2px solid #0288d1; padding-bottom: 6px; margin-top: 30px;">Archivos y Evidencias Adjuntas</h3>
@@ -519,6 +651,10 @@ async def create_record(request: Request):
     created_by = req_dict.get("created_by", "")
     send_email = bool(req_dict.get("send_email", False))
     recipient_email = req_dict.get("recipient_email", None)
+    gps_lat = req_dict.get("gps_lat", None)
+    gps_lng = req_dict.get("gps_lng", None)
+    gps_accuracy = req_dict.get("gps_accuracy", None)
+    signature_data = req_dict.get("signature_data", None)
 
     # Validate numeric solicitud_num
     if not solicitud_num.isdigit():
@@ -527,7 +663,6 @@ async def create_record(request: Request):
     if not client_name:
         raise HTTPException(status_code=400, detail="El Nombre / Razón Social es obligatorio.")
 
-    records = store.load_records()
     record_id = str(uuid.uuid4())[:8].upper()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -562,7 +697,6 @@ async def create_record(request: Request):
                 print(f"Error saving attachment {uf.filename}: {e}")
 
     email_status = "No enviado"
-    email_error = None
 
     record_data = {
         "id": record_id,
@@ -573,7 +707,11 @@ async def create_record(request: Request):
         "created_by": created_by,
         "created_at": now_str,
         "email_status": email_status,
-        "attachments": saved_attachments
+        "attachments": saved_attachments,
+        "gps_lat": gps_lat,
+        "gps_lng": gps_lng,
+        "gps_accuracy": gps_accuracy,
+        "signature_data": signature_data
     }
 
     if send_email:
@@ -600,10 +738,12 @@ async def create_record(request: Request):
                 record_data["email_status"] = f"Enviado a {recipients}"
             except Exception as e:
                 record_data["email_status"] = f"Fallido ({str(e)})"
-                email_error = str(e)
 
-    records.insert(0, record_data)
-    store.save_records(records)
+    # Save to SQLite database
+    store.add_record(record_data)
+
+    # Automatically deduct materials from centralized inventory
+    deducted = store.deduct_inventory_for_record(activities, solicitud_num, created_by)
 
     # Lookup technician full name and create in-app notification for administrators
     users = store.load_users()
@@ -611,12 +751,23 @@ async def create_record(request: Request):
     tech_name = tech_user.get("name") if tech_user else created_by
 
     attach_count = len(saved_attachments)
-    attach_text = f" con {attach_count} evidencia(s)/foto(s)" if attach_count > 0 else ""
+    extra_info_list = []
+    if attach_count > 0:
+        extra_info_list.append(f"{attach_count} evidencia(s)/foto(s)")
+    if gps_lat and gps_lng:
+        extra_info_list.append("GPS")
+    if signature_data:
+        extra_info_list.append("Firma del cliente")
+    if deducted:
+        extra_info_list.append(f"{len(deducted)} materiales descontados de inventario")
+
+    extra_text = f" ({', '.join(extra_info_list)})" if extra_info_list else ""
+
     notif = {
         "id": str(uuid.uuid4())[:8],
         "type": "new_record",
         "title": f"Nueva Solicitud #{solicitud_num}",
-        "message": f"El técnico {tech_name} ({created_by}) cargó la solicitud #{solicitud_num} para '{client_name}'{attach_text}.",
+        "message": f"El técnico {tech_name} ({created_by}) cargó la solicitud #{solicitud_num} para '{client_name}'{extra_text}.",
         "record_id": record_id,
         "solicitud_num": solicitud_num,
         "client_name": client_name,
@@ -628,9 +779,11 @@ async def create_record(request: Request):
     }
     store.add_notification(notif)
 
-    res_message = "Registro guardado exitosamente."
+    res_message = "Registro y planilla guardados exitosamente."
+    if deducted:
+        res_message += f" Se descontaron {len(deducted)} materiales del inventario central."
     if saved_attachments:
-        res_message += f" Se adjuntaron {len(saved_attachments)} archivo(s)/evidencia(s)."
+        res_message += f" Se adjuntaron {len(saved_attachments)} archivo(s)/foto(s)."
     if send_email:
         if "Enviado" in record_data["email_status"]:
             res_message += " Correo enviado por Gmail con éxito."
@@ -639,13 +792,13 @@ async def create_record(request: Request):
 
     return {
         "message": res_message,
-        "record": record_data
+        "record": record_data,
+        "inventory_deductions": deducted
     }
 
-class MarkReadRequest(BaseModel):
-    notification_id: Optional[str] = None
-    username: str
-    mark_all: bool = False
+# ==========================================
+# NOTIFICATIONS ENDPOINTS
+# ==========================================
 
 @app.get("/api/notifications")
 def get_notifications():
@@ -705,10 +858,10 @@ def resend_record_email(record_id: str, payload: dict = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al enviar correo por Gmail: {str(e)}")
 
-# Mount static files from React dist if available
-import os
+# ==========================================
+# MOUNT REACT FRONTEND STATIC FILES
+# ==========================================
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 
 DIST_DIR = os.getenv(
     "FRONTEND_DIST_DIR",
@@ -741,4 +894,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8050))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
-

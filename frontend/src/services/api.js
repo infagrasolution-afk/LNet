@@ -227,3 +227,74 @@ export async function clearNotifications() {
   return data;
 }
 
+// ==========================================
+// INVENTARIO CENTRALIZADO
+// ==========================================
+
+export async function getInventory() {
+  const res = await fetch(`${API_BASE}/inventory`);
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al cargar inventario');
+  }
+  return data;
+}
+
+export async function createInventoryItem(itemData) {
+  const res = await fetch(`${API_BASE}/inventory/items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(itemData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al crear producto en el inventario');
+  }
+  return data;
+}
+
+export async function updateInventoryItem(itemId, itemData) {
+  const res = await fetch(`${API_BASE}/inventory/items/${itemId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(itemData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al actualizar producto');
+  }
+  return data;
+}
+
+export async function deleteInventoryItem(itemId) {
+  const res = await fetch(`${API_BASE}/inventory/items/${itemId}`, {
+    method: 'DELETE',
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al eliminar producto');
+  }
+  return data;
+}
+
+export async function adjustInventoryStock(adjustData) {
+  const res = await fetch(`${API_BASE}/inventory/adjust`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(adjustData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al ajustar stock');
+  }
+  return data;
+}
+
+export async function getInventoryMovements(limit = 150) {
+  const res = await fetch(`${API_BASE}/inventory/movements?limit=${limit}`);
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al cargar movimientos de inventario');
+  }
+  return data;
+}

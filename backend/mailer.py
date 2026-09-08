@@ -48,7 +48,7 @@ def send_gmail_email(sender_email, app_password, recipient_emails, subject, reco
                 <tr>
                     <td style="padding: 8px;">{material_name}</td>
                     <td style="text-align: center; padding: 8px; color: green; font-weight: bold;">✔ Ejecutado</td>
-                    <td style="text-align: center; padding: 8px;">{qty}</td>
+                    <td style="text-align: center; padding: 8px; font-weight: bold;">{qty}</td>
                 </tr>
             """
         activities_html += "</tbody></table>"
@@ -71,6 +71,26 @@ def send_gmail_email(sender_email, app_password, recipient_emails, subject, reco
         </ul>
         """
 
+    # GPS Link
+    gps_info = ""
+    if record_data.get("gps_lat") and record_data.get("gps_lng"):
+        lat = record_data.get("gps_lat")
+        lng = record_data.get("gps_lng")
+        gps_info = f"""
+        <p style="margin: 6px 0; font-size: 14px; color: #2e7d32;">
+            📍 <strong>Ubicación GPS:</strong> {lat}, {lng} — <a href="https://maps.google.com/?q={lat},{lng}" target="_blank" style="color: #1976d2; font-weight: bold;">Ver en Google Maps</a>
+        </p>
+        """
+
+    # Signature note
+    signature_info = ""
+    if record_data.get("signature_data"):
+        signature_info = """
+        <p style="margin: 6px 0; font-size: 13px; color: #0288d1;">
+            ✍️ <strong>Firma Digital:</strong> Registrada y adjunta al reporte oficial.
+        </p>
+        """
+
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -85,9 +105,11 @@ def send_gmail_email(sender_email, app_password, recipient_emails, subject, reco
             </div>
             <div style="padding: 24px;">
                 <div style="background: #e3f2fd; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #1976d2;">
-                    <p style="margin: 4px 0; font-size: 15px;"><strong>Nro. Solicitud:</strong> {record_data.get('solicitud_num')}</p>
+                    <p style="margin: 4px 0; font-size: 15px;"><strong>Nro. Solicitud:</strong> #{record_data.get('solicitud_num')}</p>
                     <p style="margin: 4px 0; font-size: 15px;"><strong>Nombre / Razón Social:</strong> {record_data.get('client_name')}</p>
                     <p style="margin: 4px 0; font-size: 13px; color: #555;"><strong>Registrado Por:</strong> {record_data.get('created_by')} el {record_data.get('created_at')}</p>
+                    {gps_info}
+                    {signature_info}
                 </div>
 
                 <h3 style="color: #333; border-bottom: 2px solid #1976d2; padding-bottom: 8px; margin-top: 25px;">Ejecución de Actividades / Materiales</h3>
