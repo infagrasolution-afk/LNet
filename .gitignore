@@ -19,12 +19,13 @@ __pycache__/
 .idea/
 .DS_Store
 
-# Local database & attachments
+# Local database, JSON data & attachments
 *.db
 *.db-wal
 *.db-shm
 backend/data/*.db
 backend/data/*.db-wal
 backend/data/*.db-shm
+backend/data/*.json
 backend/data/attachments/*
 !backend/data/attachments/.gitkeep
