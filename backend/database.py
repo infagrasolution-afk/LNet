@@ -235,126 +235,142 @@ def _migrate_from_json_and_seed_defaults():
             ))
         conn.commit()
 
-    # Migrar Registros si la tabla está vacía
-    cursor.execute("SELECT COUNT(*) as count FROM records;")
-    if cursor.fetchone()["count"] == 0:
-        json_records_path = os.path.join(DATA_DIR, "records.json")
-        default_records_path = os.path.join(DEFAULT_DATA_DIR, "records.json")
-        recs_to_import = []
-        if os.path.exists(json_records_path):
-            try:
-                with open(json_records_path, "r", encoding="utf-8") as f:
-                    recs_to_import = json.load(f)
-            except Exception:
-                pass
-        elif os.path.exists(default_records_path):
-            try:
-                with open(default_records_path, "r", encoding="utf-8") as f:
-                    recs_to_import = json.load(f)
-            except Exception:
-                pass
+    # Sincronizar Registros base desde records.json (INSERT OR IGNORE: preserva 100% de datos existentes sin sobreescribir)
+    json_records_path = os.path.join(DATA_DIR, "records.json")
+    default_records_path = os.path.join(DEFAULT_DATA_DIR, "records.json")
+    recs_to_import = []
+    if os.path.exists(json_records_path):
+        try:
+            with open(json_records_path, "r", encoding="utf-8") as f:
+                recs_to_import = json.load(f)
+        except Exception:
+            pass
+    if not recs_to_import and os.path.exists(default_records_path):
+        try:
+            with open(default_records_path, "r", encoding="utf-8") as f:
+                recs_to_import = json.load(f)
+        except Exception:
+            pass
 
-        if not recs_to_import:
-            recs_to_import = [
-                {
-                    "id": "D7A09687",
-                    "solicitud_num": "2421299",
-                    "client_name": "PERFUMES FACTORY, C.A.",
-                    "activities": [
-                        {"id": "act-1", "name": "Fibra Óptica", "description": "Fibra Óptica", "detail": "1H C/guía Negro", "checked": True, "unid_mts": "220"},
-                        {"id": "act-3", "name": "CONECTOR MECANICO SC-APC", "description": "INV-200-0030 | CONECTOR MECANICO SC-APC", "detail": "", "checked": True, "unid_mts": "2"}
-                    ],
-                    "observations": "Prueba de instalación completada satisfactoriamente",
-                    "created_by": "linfante",
-                    "created_at": "2026-08-21 14:34:25",
-                    "email_status": "No enviado",
-                    "attachments": [],
-                    "gps_lat": 10.4806,
-                    "gps_lng": -66.9036,
-                    "gps_accuracy": 12.5,
-                    "signature_data": None
-                },
-                {
-                    "id": "6A16A167",
-                    "solicitud_num": "78945",
-                    "client_name": "prueba",
-                    "activities": [
-                        {"id": "act-1", "name": "Fibra Óptica", "description": "Fibra Óptica (1H C/guía Negro / 1H S/guía Negro / 1H S/Blanco / 1H Anti roedores / 4H Redondo)", "detail": "1H S/Blanco", "checked": True, "unid_mts": "20"},
-                        {"id": "act-2", "name": "ROSETA OPTICA FTTX 2-PTU", "description": "INV-200-0069 | ROSETA OPTICA FTTX 2-PTU", "detail": "", "checked": True, "unid_mts": "10"},
-                        {"id": "act-3", "name": "CONECTOR MECANICO SC-APC", "description": "INV-200-0030 | CONECTOR MECANICO SC-APC", "detail": "", "checked": True, "unid_mts": "3"}
-                    ],
-                    "observations": "Instalación en sitio",
-                    "created_by": "jduran",
-                    "created_at": "2026-08-21 15:01:58",
-                    "email_status": "No enviado",
-                    "attachments": [],
-                    "gps_lat": None,
-                    "gps_lng": None,
-                    "gps_accuracy": None,
-                    "signature_data": None
-                },
-                {
-                    "id": "E4A4BCA4",
-                    "solicitud_num": "4561",
-                    "client_name": "prueba312",
-                    "activities": [
-                        {"id": "act-7", "name": "PATCH CORD UTP RJ-45 CAT5E 1MT", "description": "INV-400-0157 | PATCH CORD UTP RJ-45 CAT5E 1MT", "detail": "", "checked": True, "unid_mts": "1"},
-                        {"id": "act-8", "name": "ETIQUETA SERIALIZADA", "description": "INV-300-0028 | ETIQUETA SERIALIZADA", "detail": "", "checked": True, "unid_mts": "2"},
-                        {"id": "act-9", "name": "Equipo ONT", "description": "INV-100-0047 | Equipo ONT", "detail": "", "checked": True, "unid_mts": "3"}
-                    ],
-                    "observations": "Sin observaciones adicionales",
-                    "created_by": "jduran",
-                    "created_at": "2026-08-21 15:03:09",
-                    "email_status": "No enviado",
-                    "attachments": [],
-                    "gps_lat": None,
-                    "gps_lng": None,
-                    "gps_accuracy": None,
-                    "signature_data": None
-                },
-                {
-                    "id": "REC-NETUNO-01",
-                    "solicitud_num": "2527341",
-                    "client_name": "ADM GLOBAL CENTER",
-                    "activities": [
-                        {"id": "act-1", "name": "Fibra Óptica", "checked": True, "unid_mts": "145"},
-                        {"id": "act-3", "name": "CONECTOR MECANICO SC-APC", "checked": True, "unid_mts": "2"}
-                    ],
-                    "observations": "Instalación corporativa aprobada.",
-                    "created_by": "linfante",
-                    "created_at": "2026-09-19 14:00:00",
-                    "email_status": "No enviado",
-                    "attachments": [],
-                    "gps_lat": None,
-                    "gps_lng": None,
-                    "gps_accuracy": None,
-                    "signature_data": None
-                }
-            ]
+    if not recs_to_import:
+        recs_to_import = [
+            {
+                "id": "REC-NETUNO-01",
+                "solicitud_num": "2527341",
+                "client_name": "ADM GLOBAL CENTER",
+                "activities": [
+                    {"id": "act-1", "name": "Fibra Óptica", "checked": True, "unid_mts": "145"},
+                    {"id": "act-3", "name": "CONECTOR MECANICO SC-APC", "checked": True, "unid_mts": "2"}
+                ],
+                "observations": "Instalación corporativa aprobada.",
+                "created_by": "linfante",
+                "created_at": "2026-09-19 14:00:00",
+                "email_status": "No enviado",
+                "attachments": [],
+                "gps_lat": None,
+                "gps_lng": None,
+                "gps_accuracy": None,
+                "signature_data": None
+            },
+            {
+                "id": "REC-NETUNO-02",
+                "solicitud_num": "2446101",
+                "client_name": "AMERICAM BIO",
+                "activities": [
+                    {"id": "act-1", "name": "Fibra Óptica", "checked": True, "unid_mts": "100"},
+                    {"id": "act-3", "name": "CONECTOR MECANICO SC-APC", "checked": True, "unid_mts": "2"}
+                ],
+                "observations": "Presupuesto N° 20260821-S2652 - Tipo EDIFICIO - INSTALACIONES FP",
+                "created_by": "linfante",
+                "created_at": "2026-08-21 10:00:00",
+                "email_status": "No enviado",
+                "attachments": [],
+                "gps_lat": None,
+                "gps_lng": None,
+                "gps_accuracy": None,
+                "signature_data": None
+            },
+            {
+                "id": "D7A09687",
+                "solicitud_num": "2421299",
+                "client_name": "PERFUMES FACTORY, C.A.",
+                "activities": [
+                    {"id": "act-1", "name": "Fibra Óptica", "description": "Fibra Óptica", "detail": "1H C/guía Negro", "checked": True, "unid_mts": "220"},
+                    {"id": "act-3", "name": "CONECTOR MECANICO SC-APC", "description": "INV-200-0030 | CONECTOR MECANICO SC-APC", "detail": "", "checked": True, "unid_mts": "2"}
+                ],
+                "observations": "Prueba de instalación completada satisfactoriamente",
+                "created_by": "linfante",
+                "created_at": "2026-08-21 14:34:25",
+                "email_status": "No enviado",
+                "attachments": [],
+                "gps_lat": 10.4806,
+                "gps_lng": -66.9036,
+                "gps_accuracy": 12.5,
+                "signature_data": None
+            },
+            {
+                "id": "6A16A167",
+                "solicitud_num": "78945",
+                "client_name": "prueba",
+                "activities": [
+                    {"id": "act-1", "name": "Fibra Óptica", "description": "Fibra Óptica (1H C/guía Negro / 1H S/guía Negro / 1H S/Blanco / 1H Anti roedores / 4H Redondo)", "detail": "1H S/Blanco", "checked": True, "unid_mts": "20"},
+                    {"id": "act-2", "name": "ROSETA OPTICA FTTX 2-PTU", "description": "INV-200-0069 | ROSETA OPTICA FTTX 2-PTU", "detail": "", "checked": True, "unid_mts": "10"},
+                    {"id": "act-3", "name": "CONECTOR MECANICO SC-APC", "description": "INV-200-0030 | CONECTOR MECANICO SC-APC", "detail": "", "checked": True, "unid_mts": "3"}
+                ],
+                "observations": "Instalación en sitio",
+                "created_by": "jduran",
+                "created_at": "2026-08-21 15:01:58",
+                "email_status": "No enviado",
+                "attachments": [],
+                "gps_lat": None,
+                "gps_lng": None,
+                "gps_accuracy": None,
+                "signature_data": None
+            },
+            {
+                "id": "E4A4BCA4",
+                "solicitud_num": "4561",
+                "client_name": "prueba312",
+                "activities": [
+                    {"id": "act-7", "name": "PATCH CORD UTP RJ-45 CAT5E 1MT", "description": "INV-400-0157 | PATCH CORD UTP RJ-45 CAT5E 1MT", "detail": "", "checked": True, "unid_mts": "1"},
+                    {"id": "act-8", "name": "ETIQUETA SERIALIZADA", "description": "INV-300-0028 | ETIQUETA SERIALIZADA", "detail": "", "checked": True, "unid_mts": "2"},
+                    {"id": "act-9", "name": "Equipo ONT", "description": "INV-100-0047 | Equipo ONT", "detail": "", "checked": True, "unid_mts": "3"}
+                ],
+                "observations": "Sin observaciones adicionales",
+                "created_by": "jduran",
+                "created_at": "2026-08-21 15:03:09",
+                "email_status": "No enviado",
+                "attachments": [],
+                "gps_lat": None,
+                "gps_lng": None,
+                "gps_accuracy": None,
+                "signature_data": None
+            }
+        ]
 
-        for r in recs_to_import:
-            cursor.execute("""
-                INSERT OR IGNORE INTO records (
-                    id, solicitud_num, client_name, activities_json, observations,
-                    created_by, created_at, email_status, attachments_json,
-                    gps_lat, gps_lng, gps_accuracy, signature_data
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """, (
-                r.get("id") or str(uuid.uuid4())[:8].upper(),
-                str(r.get("solicitud_num", "")),
-                r.get("client_name", ""),
-                json.dumps(r.get("activities", []), ensure_ascii=False),
-                r.get("observations", ""),
-                r.get("created_by", ""),
-                r.get("created_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-                r.get("email_status", "No enviado"),
-                json.dumps(r.get("attachments", []), ensure_ascii=False),
-                r.get("gps_lat"),
-                r.get("gps_lng"),
-                r.get("gps_accuracy"),
-                r.get("signature_data")
-            ))
-        conn.commit()
+    for r in recs_to_import:
+        cursor.execute("""
+            INSERT OR IGNORE INTO records (
+                id, solicitud_num, client_name, activities_json, observations,
+                created_by, created_at, email_status, attachments_json,
+                gps_lat, gps_lng, gps_accuracy, signature_data
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, (
+            r.get("id") or str(uuid.uuid4())[:8].upper(),
+            str(r.get("solicitud_num", "")),
+            r.get("client_name", ""),
+            json.dumps(r.get("activities", []), ensure_ascii=False) if isinstance(r.get("activities"), list) else str(r.get("activities", "[]")),
+            r.get("observations", ""),
+            r.get("created_by", ""),
+            r.get("created_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            r.get("email_status", "No enviado"),
+            json.dumps(r.get("attachments", []), ensure_ascii=False) if isinstance(r.get("attachments"), list) else str(r.get("attachments", "[]")),
+            r.get("gps_lat"),
+            r.get("gps_lng"),
+            r.get("gps_accuracy"),
+            r.get("signature_data")
+        ))
+    conn.commit()
 
     # Migrar Notificaciones
     cursor.execute("SELECT COUNT(*) as count FROM notifications;")

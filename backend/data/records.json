@@ -140,5 +140,37 @@
     "gps_lng": null,
     "gps_accuracy": null,
     "signature_data": null
+  },
+  {
+    "id": "REC-NETUNO-02",
+    "solicitud_num": "2446101",
+    "client_name": "AMERICAM BIO",
+    "activities": [
+      {
+        "id": "act-1",
+        "name": "Fibra Óptica",
+        "description": "Fibra Óptica (1H / 4H Drop)",
+        "detail": "Instalación EDIFICIO",
+        "checked": true,
+        "unid_mts": "100"
+      },
+      {
+        "id": "act-3",
+        "name": "CONECTOR MECANICO SC-APC",
+        "description": "INV-200-0030 | CONECTOR MECANICO SC-APC",
+        "detail": "",
+        "checked": true,
+        "unid_mts": "2"
+      }
+    ],
+    "observations": "Presupuesto N° 20260821-S2652 - Tipo EDIFICIO - INSTALACIONES FP",
+    "created_by": "linfante",
+    "created_at": "2026-08-21 10:00:00",
+    "email_status": "No enviado",
+    "attachments": [],
+    "gps_lat": null,
+    "gps_lng": null,
+    "gps_accuracy": null,
+    "signature_data": null
   }
 ]
