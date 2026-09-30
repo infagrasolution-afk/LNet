@@ -510,6 +510,44 @@ def get_system_diagnostic(full_data: bool = False):
     return result
 
 # ==========================================
+# RESPALDOS Y PROTECCIÓN PERMANENTE DE DATOS
+# ==========================================
+
+@app.get("/api/system/backup/download")
+def download_full_system_backup():
+    """Genera y descarga un respaldo completo JSON de toda la base de datos (planillas, usuarios, inventario)."""
+    payload = store.create_full_backup_payload()
+    content_bytes = json.dumps(payload, indent=2, ensure_ascii=False).encode("utf-8")
+    filename = f"LNet_Backup_Completo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    return Response(
+        content=content_bytes,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+@app.get("/api/system/backup/download-db")
+def download_sqlite_database():
+    """Descarga directamente el archivo SQLite físico lnet.db para resguardo local en la PC del administrador."""
+    db_path = getattr(database, "DB_FILE", "")
+    if not os.path.exists(db_path):
+        raise HTTPException(status_code=404, detail="Archivo de base de datos no encontrado.")
+    filename = f"lnet_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    return FileResponse(
+        path=db_path,
+        media_type="application/x-sqlite3",
+        filename=filename
+    )
+
+@app.post("/api/system/backup/restore")
+def restore_system_backup(payload: Dict[str, Any] = Body(...)):
+    """Restaura o incorpora planillas desde un archivo de respaldo JSON sin sobreescribir datos existentes."""
+    try:
+        res = store.restore_full_backup_payload(payload)
+        return {"message": "Respaldo procesado con éxito.", "result": res}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al restaurar respaldo: {str(e)}")
+
+# ==========================================
 # RECORDS / PLANILLAS ENDPOINTS
 # ==========================================
 

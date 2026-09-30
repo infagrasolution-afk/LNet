@@ -9,6 +9,7 @@ import database
 DEFAULT_DATA_DIR = database.DEFAULT_DATA_DIR
 DATA_DIR = database.DATA_DIR
 ATTACHMENTS_DIR = os.path.join(DATA_DIR, "attachments")
+BACKUPS_DIR = os.path.join(DATA_DIR, "backups")
 
 def ensure_data_dir():
     """Asegura la existencia de directorios e inicializa la base de datos SQLite con modo WAL."""
@@ -16,7 +17,37 @@ def ensure_data_dir():
         os.makedirs(DATA_DIR, exist_ok=True)
     if not os.path.exists(ATTACHMENTS_DIR):
         os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
+    if not os.path.exists(BACKUPS_DIR):
+        os.makedirs(BACKUPS_DIR, exist_ok=True)
     database.init_db()
+
+def backup_data_mirror():
+    """Redundancia Dual Automática: sincroniza a records.json y genera copias diarias fechadas."""
+    try:
+        ensure_data_dir()
+        recs = load_records()
+        # 1. Espejo en records.json de DATA_DIR
+        json_path = os.path.join(DATA_DIR, "records.json")
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(recs, f, indent=2, ensure_ascii=False)
+            
+        # 2. Espejo en DEFAULT_DATA_DIR (si es diferente, ej. contenedor Render vs persistente)
+        if os.path.abspath(DATA_DIR) != os.path.abspath(DEFAULT_DATA_DIR):
+            try:
+                os.makedirs(DEFAULT_DATA_DIR, exist_ok=True)
+                default_json = os.path.join(DEFAULT_DATA_DIR, "records.json")
+                with open(default_json, "w", encoding="utf-8") as f:
+                    json.dump(recs, f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+                
+        # 3. Respaldo diario automático fechado
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        daily_backup_path = os.path.join(BACKUPS_DIR, f"records_backup_{today_str}.json")
+        with open(daily_backup_path, "w", encoding="utf-8") as f:
+            json.dump(recs, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
 
 def get_record_attachments_dir(record_id: str) -> str:
     """Retorna la ruta del directorio de adjuntos para un registro."""
@@ -259,9 +290,10 @@ def add_record(record: Dict[str, Any]):
     ))
     conn.commit()
     conn.close()
+    backup_data_mirror()
 
 def save_records(records: List[Dict[str, Any]]):
-    """Guarda/actualiza la lista de registros en SQLite."""
+    """Guarda/actualiza la lista de registros en SQLite y actualiza el espejo JSON."""
     ensure_data_dir()
     conn = database.get_db_connection()
     cursor = conn.cursor()
@@ -302,6 +334,42 @@ def save_records(records: List[Dict[str, Any]]):
         ))
     conn.commit()
     conn.close()
+    backup_data_mirror()
+
+def create_full_backup_payload() -> Dict[str, Any]:
+    """Exporta todas las tablas del sistema para una descarga de respaldo completo con 1 clic."""
+    ensure_data_dir()
+    return {
+        "version": "2.0",
+        "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "total_records": len(load_records()),
+        "users": load_users(),
+        "records": load_records(),
+        "inventory": get_inventory(),
+        "inventory_movements": get_inventory_movements(limit=300),
+        "settings": load_settings()
+    }
+
+def restore_full_backup_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Restaura e incorpora datos de respaldo usando INSERT OR IGNORE para jamás borrar nada existente."""
+    ensure_data_dir()
+    records_restored = 0
+    records = payload.get("records", [])
+    if isinstance(records, list):
+        for r in records:
+            sol = str(r.get("solicitud_num", ""))
+            if sol and not check_solicitud_exists(sol):
+                try:
+                    add_record(r)
+                    records_restored += 1
+                except Exception:
+                    pass
+    backup_data_mirror()
+    return {
+        "status": "success",
+        "records_restored": records_restored,
+        "total_current_records": len(load_records())
+    }
 
 # ==========================================
 # CONFIGURACIONES (SETTINGS)

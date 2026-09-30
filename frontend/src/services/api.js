@@ -503,3 +503,49 @@ export async function getInventoryMovements(limit = 150) {
   }
   return data;
 }
+
+// ==========================================
+// RESPALDOS Y SEGURIDAD DEL SISTEMA
+// ==========================================
+
+export async function downloadFullSystemBackup() {
+  const res = await authFetch(`${API_BASE}/system/backup/download`);
+  if (!res.ok) throw new Error('Error al descargar copia de seguridad');
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `LNet_Backup_Completo_${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function downloadSqliteDatabase() {
+  const res = await authFetch(`${API_BASE}/system/backup/download-db`);
+  if (!res.ok) throw new Error('Error al descargar base de datos SQLite');
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `lnet_${new Date().toISOString().slice(0, 10)}.db`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function restoreSystemBackup(backupJsonData) {
+  const res = await authFetch(`${API_BASE}/system/backup/restore`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(backupJsonData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al restaurar respaldo');
+  }
+  return data;
+}
+

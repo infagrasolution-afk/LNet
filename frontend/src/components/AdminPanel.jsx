@@ -44,6 +44,10 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import StorageIcon from '@mui/icons-material/Storage';
+import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import SecurityIcon from '@mui/icons-material/Security';
 
 import {
   getUsers,
@@ -57,6 +61,9 @@ import {
   testEmailConnection,
   downloadRecordsExcel,
   downloadNetunoRelacionExcel,
+  downloadFullSystemBackup,
+  downloadSqliteDatabase,
+  restoreSystemBackup,
 } from '../services/api';
 
 export default function AdminPanel() {
@@ -80,8 +87,36 @@ export default function AdminPanel() {
   const [openTestEmailModal, setOpenTestEmailModal] = useState(false);
   const [testRecipient, setTestRecipient] = useState('');
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
 
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+
+  const handleRestoreFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setRestoringBackup(true);
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      const res = await restoreSystemBackup(json);
+      setToast({
+        open: true,
+        message: `¡Respaldo procesado con éxito! Se incorporaron ${res.result?.records_restored || 0} registros nuevos de forma segura.`,
+        severity: 'success',
+      });
+      loadData();
+    } catch (err) {
+      setToast({
+        open: true,
+        message: `Error al procesar archivo de respaldo: ${err.message}`,
+        severity: 'error',
+      });
+    } finally {
+      setRestoringBackup(false);
+      e.target.value = '';
+    }
+  };
+
 
   const loadData = async () => {
     setLoadingUsers(true);
@@ -645,6 +680,152 @@ export default function AdminPanel() {
                 </Button>
               )}
             </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* 4. SECCIÓN DE SEGURIDAD Y RESPALDOS INDESTRUCTIBLES */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 3,
+          backgroundColor: '#0f172a',
+          borderRadius: 3,
+          border: '1px solid rgba(56, 189, 248, 0.25)',
+          mb: 4,
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: 'linear-gradient(90deg, #10b981 0%, #38bdf8 100%)',
+          },
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <SecurityIcon sx={{ color: '#10b981', fontSize: 30 }} />
+            <Box>
+              <Typography variant="h6" sx={{ color: '#f8fafc', fontWeight: 700 }}>
+                Centro de Seguridad, Respaldos y Protección Permanente de Datos
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                Garantiza que la información jamás se pierda. Descarga copias de seguridad a tu PC o restaura registros en segundos.
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Chip label="🛡️ Redundancia Dual Activa" size="small" sx={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 600 }} />
+            <Chip label="💾 SQLite WAL + Espejo JSON" size="small" sx={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 600 }} />
+            <Chip label="☁️ Render /var/data" size="small" sx={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', fontWeight: 600 }} />
+          </Box>
+        </Box>
+
+        <Divider sx={{ my: 2, borderColor: 'rgba(255, 255, 255, 0.08)' }} />
+
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 2 }}>
+              <CardContent>
+                <Typography variant="subtitle2" sx={{ color: '#38bdf8', fontWeight: 700, mb: 0.5 }}>
+                  Respaldo Completo (.JSON)
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 2 }}>
+                  Descarga un archivo con todas las planillas, usuarios, materiales e historial.
+                </Typography>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  startIcon={<CloudDownloadIcon />}
+                  onClick={async () => {
+                    try {
+                      await downloadFullSystemBackup();
+                      setToast({ open: true, message: '¡Copia de seguridad descargada con éxito!', severity: 'success' });
+                    } catch (e) {
+                      setToast({ open: true, message: e.message, severity: 'error' });
+                    }
+                  }}
+                  sx={{
+                    backgroundColor: '#10b981',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    '&:hover': { backgroundColor: '#059669' },
+                  }}
+                >
+                  Descargar Respaldo JSON
+                </Button>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <Card sx={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 2 }}>
+              <CardContent>
+                <Typography variant="subtitle2" sx={{ color: '#38bdf8', fontWeight: 700, mb: 0.5 }}>
+                  Base de Datos Directa (.DB)
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 2 }}>
+                  Descarga el archivo físico SQLite lnet.db para guardarlo en una memoria o disco externo.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  startIcon={<StorageIcon />}
+                  onClick={async () => {
+                    try {
+                      await downloadSqliteDatabase();
+                      setToast({ open: true, message: '¡Base de datos SQLite descargada con éxito!', severity: 'success' });
+                    } catch (e) {
+                      setToast({ open: true, message: e.message, severity: 'error' });
+                    }
+                  }}
+                  sx={{
+                    borderColor: '#38bdf8',
+                    color: '#38bdf8',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    '&:hover': { borderColor: '#0284c7', backgroundColor: 'rgba(56, 189, 248, 0.08)' },
+                  }}
+                >
+                  Descargar lnet.db
+                </Button>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <Card sx={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 2 }}>
+              <CardContent>
+                <Typography variant="subtitle2" sx={{ color: '#38bdf8', fontWeight: 700, mb: 0.5 }}>
+                  Restaurar / Importar Respaldo
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 2 }}>
+                  Carga un respaldo previo. Incorpora planillas nuevas sin borrar nada de lo existente.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  fullWidth
+                  disabled={restoringBackup}
+                  startIcon={restoringBackup ? <CircularProgress size={18} /> : <CloudUploadIcon />}
+                  sx={{
+                    borderColor: 'rgba(255, 255, 255, 0.25)',
+                    color: '#f8fafc',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    '&:hover': { borderColor: '#10b981', color: '#10b981' },
+                  }}
+                >
+                  {restoringBackup ? 'Restaurando...' : 'Seleccionar Archivo JSON'}
+                  <input type="file" accept=".json" hidden onChange={handleRestoreFile} />
+                </Button>
+              </CardContent>
+            </Card>
           </Grid>
         </Grid>
       </Paper>
