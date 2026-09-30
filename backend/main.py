@@ -427,6 +427,41 @@ def get_inventory_movements(limit: int = 150):
     """Retorna los últimos movimientos del historial de auditoría de inventario."""
     return store.get_inventory_movements(limit=limit)
 
+@app.get("/api/system/diagnostic")
+def get_system_diagnostic():
+    """Diagnóstico de rutas, discos persistentes (/var/data) y bases de datos en Render y local."""
+    import sqlite3
+    data_dir = database.DATA_DIR
+    default_data_dir = database.DEFAULT_DATA_DIR
+    
+    result = {
+        "DATA_DIR": data_dir,
+        "DEFAULT_DATA_DIR": default_data_dir,
+        "env_DATA_DIR": os.getenv("DATA_DIR"),
+        "var_data_exists": os.path.exists("/var/data"),
+        "files_in_var_data": os.listdir("/var/data") if os.path.exists("/var/data") else [],
+        "files_in_data_dir": os.listdir(data_dir) if os.path.exists(data_dir) else [],
+        "records_count": len(store.load_records()),
+        "var_db_records": []
+    }
+    
+    var_db = "/var/data/lnet.db"
+    if os.path.exists(var_db):
+        try:
+            conn = sqlite3.connect(var_db)
+            c = conn.cursor()
+            c.execute("SELECT count(*) FROM records")
+            cnt = c.fetchone()[0]
+            c.execute("SELECT id, solicitud_num, client_name, created_by, created_at FROM records")
+            sample = [dict(zip(["id", "solicitud_num", "client_name", "created_by", "created_at"], row)) for row in c.fetchall()]
+            conn.close()
+            result["var_db_records_count"] = cnt
+            result["var_db_records"] = sample
+        except Exception as e:
+            result["var_db_error"] = str(e)
+            
+    return result
+
 # ==========================================
 # RECORDS / PLANILLAS ENDPOINTS
 # ==========================================

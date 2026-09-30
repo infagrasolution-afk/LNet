@@ -5,7 +5,11 @@ import uuid
 from datetime import datetime
 
 DEFAULT_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-DATA_DIR = os.getenv("DATA_DIR", DEFAULT_DATA_DIR)
+# Priorizar y auto-detectar disco persistente /var/data de Render
+if os.path.exists("/var/data") and os.path.isdir("/var/data"):
+    DATA_DIR = os.getenv("DATA_DIR", "/var/data")
+else:
+    DATA_DIR = os.getenv("DATA_DIR", DEFAULT_DATA_DIR)
 DB_FILE = os.path.join(DATA_DIR, "lnet.db")
 
 def get_db_connection():
