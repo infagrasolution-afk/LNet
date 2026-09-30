@@ -429,37 +429,59 @@ def get_inventory_movements(limit: int = 150):
 
 @app.get("/api/system/diagnostic")
 def get_system_diagnostic():
-    """Diagnóstico de rutas, discos persistentes (/var/data) y bases de datos en Render y local."""
+    """Diagnóstico seguro de rutas, discos persistentes (/var/data) y bases de datos en Render y local."""
     import sqlite3
-    data_dir = database.DATA_DIR
-    default_data_dir = database.DEFAULT_DATA_DIR
-    
-    result = {
-        "DATA_DIR": data_dir,
-        "DEFAULT_DATA_DIR": default_data_dir,
-        "env_DATA_DIR": os.getenv("DATA_DIR"),
-        "var_data_exists": os.path.exists("/var/data"),
-        "files_in_var_data": os.listdir("/var/data") if os.path.exists("/var/data") else [],
-        "files_in_data_dir": os.listdir(data_dir) if os.path.exists(data_dir) else [],
-        "records_count": len(store.load_records()),
-        "var_db_records": []
-    }
-    
-    var_db = "/var/data/lnet.db"
-    if os.path.exists(var_db):
+    import traceback
+    result = {}
+    try:
+        data_dir = getattr(database, "DATA_DIR", "")
+        default_data_dir = getattr(database, "DEFAULT_DATA_DIR", "")
+        result["DATA_DIR"] = data_dir
+        result["DEFAULT_DATA_DIR"] = default_data_dir
+        result["env_DATA_DIR"] = os.getenv("DATA_DIR")
+        
         try:
-            conn = sqlite3.connect(var_db)
-            c = conn.cursor()
-            c.execute("SELECT count(*) FROM records")
-            cnt = c.fetchone()[0]
-            c.execute("SELECT id, solicitud_num, client_name, created_by, created_at FROM records")
-            sample = [dict(zip(["id", "solicitud_num", "client_name", "created_by", "created_at"], row)) for row in c.fetchall()]
-            conn.close()
-            result["var_db_records_count"] = cnt
-            result["var_db_records"] = sample
+            result["var_data_exists"] = os.path.exists("/var/data")
+            result["files_in_var_data"] = os.listdir("/var/data") if os.path.exists("/var/data") else []
         except Exception as e:
-            result["var_db_error"] = str(e)
+            result["var_data_error"] = str(e)
             
+        try:
+            result["files_in_data_dir"] = os.listdir(data_dir) if os.path.exists(data_dir) else []
+        except Exception as e:
+            result["data_dir_error"] = str(e)
+            
+        try:
+            recs = store.load_records()
+            result["records_count"] = len(recs)
+            result["current_records_sample"] = [
+                {"id": r.get("id"), "solicitud": r.get("solicitud_num"), "cliente": r.get("client_name"), "fecha": r.get("created_at")}
+                for r in recs
+            ]
+        except Exception as e:
+            result["load_records_error"] = str(e)
+
+        var_db = "/var/data/lnet.db"
+        if os.path.exists(var_db):
+            try:
+                conn = sqlite3.connect(var_db, timeout=5.0)
+                c = conn.cursor()
+                c.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                result["var_db_tables"] = [row[0] for row in c.fetchall()]
+                c.execute("SELECT count(*) FROM records")
+                result["var_db_records_count"] = c.fetchone()[0]
+                c.execute("SELECT id, solicitud_num, client_name, created_by, created_at FROM records")
+                result["var_db_records"] = [
+                    {"id": row[0], "solicitud_num": row[1], "client_name": row[2], "created_by": row[3], "created_at": row[4]}
+                    for row in c.fetchall()
+                ]
+                conn.close()
+            except Exception as e:
+                result["var_db_inspect_error"] = str(e)
+    except Exception as general_err:
+        result["fatal_error"] = str(general_err)
+        result["traceback"] = traceback.format_exc()
+
     return result
 
 # ==========================================
