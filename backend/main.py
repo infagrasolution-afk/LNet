@@ -16,6 +16,8 @@ import store
 import mailer
 import auth
 import reports
+import database
+
 
 
 # Configure structured logging
@@ -428,7 +430,7 @@ def get_inventory_movements(limit: int = 150):
     return store.get_inventory_movements(limit=limit)
 
 @app.get("/api/system/diagnostic")
-def get_system_diagnostic():
+def get_system_diagnostic(full_data: bool = False):
     """Diagnóstico seguro de rutas, discos persistentes (/var/data) y bases de datos en Render y local."""
     import sqlite3
     import traceback
@@ -454,27 +456,50 @@ def get_system_diagnostic():
         try:
             recs = store.load_records()
             result["records_count"] = len(recs)
-            result["current_records_sample"] = [
-                {"id": r.get("id"), "solicitud": r.get("solicitud_num"), "cliente": r.get("client_name"), "fecha": r.get("created_at")}
-                for r in recs
-            ]
+            if full_data:
+                result["current_records_full"] = recs
+            else:
+                result["current_records_sample"] = [
+                    {"id": r.get("id"), "solicitud": r.get("solicitud_num"), "cliente": r.get("client_name"), "fecha": r.get("created_at")}
+                    for r in recs
+                ]
         except Exception as e:
             result["load_records_error"] = str(e)
+
+        # Buscar todos los archivos .db y .json relevantes en /var y /app
+        found_databases = []
+        for search_root in ["/var/data", "/app"]:
+            if os.path.exists(search_root):
+                try:
+                    for root, dirs, files in os.walk(search_root):
+                        for f in files:
+                            if f.endswith(".db") or (f.endswith(".json") and "record" in f.lower()):
+                                p = os.path.join(root, f)
+                                sz = os.path.getsize(p)
+                                found_databases.append({"path": p, "size": sz})
+                except Exception as e:
+                    pass
+        result["found_storage_files"] = found_databases
 
         var_db = "/var/data/lnet.db"
         if os.path.exists(var_db):
             try:
                 conn = sqlite3.connect(var_db, timeout=5.0)
+                conn.row_factory = sqlite3.Row
                 c = conn.cursor()
                 c.execute("SELECT name FROM sqlite_master WHERE type='table'")
                 result["var_db_tables"] = [row[0] for row in c.fetchall()]
                 c.execute("SELECT count(*) FROM records")
                 result["var_db_records_count"] = c.fetchone()[0]
-                c.execute("SELECT id, solicitud_num, client_name, created_by, created_at FROM records")
-                result["var_db_records"] = [
-                    {"id": row[0], "solicitud_num": row[1], "client_name": row[2], "created_by": row[3], "created_at": row[4]}
-                    for row in c.fetchall()
-                ]
+                c.execute("SELECT * FROM records")
+                rows = c.fetchall()
+                if full_data:
+                    result["var_db_records_full"] = [dict(r) for r in rows]
+                else:
+                    result["var_db_records"] = [
+                        {"id": r["id"], "solicitud_num": r["solicitud_num"], "client_name": r["client_name"], "created_by": r["created_by"], "created_at": r["created_at"]}
+                        for r in rows
+                    ]
                 conn.close()
             except Exception as e:
                 result["var_db_inspect_error"] = str(e)

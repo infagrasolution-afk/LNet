@@ -6,8 +6,8 @@ from typing import List, Dict, Any, Optional
 
 import database
 
-DEFAULT_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-DATA_DIR = os.getenv("DATA_DIR", DEFAULT_DATA_DIR)
+DEFAULT_DATA_DIR = database.DEFAULT_DATA_DIR
+DATA_DIR = database.DATA_DIR
 ATTACHMENTS_DIR = os.path.join(DATA_DIR, "attachments")
 
 def ensure_data_dir():
