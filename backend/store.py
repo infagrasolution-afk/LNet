@@ -11,15 +11,20 @@ DATA_DIR = database.DATA_DIR
 ATTACHMENTS_DIR = os.path.join(DATA_DIR, "attachments")
 BACKUPS_DIR = os.path.join(DATA_DIR, "backups")
 
+_db_initialized = False
+
 def ensure_data_dir():
-    """Asegura la existencia de directorios e inicializa la base de datos SQLite con modo WAL."""
+    """Asegura la existencia de directorios e inicializa la base de datos SQLite con modo WAL una sola vez."""
+    global _db_initialized
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR, exist_ok=True)
     if not os.path.exists(ATTACHMENTS_DIR):
         os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
     if not os.path.exists(BACKUPS_DIR):
         os.makedirs(BACKUPS_DIR, exist_ok=True)
-    database.init_db()
+    if not _db_initialized:
+        database.init_db()
+        _db_initialized = True
 
 def backup_data_mirror():
     """Redundancia Dual Automática: sincroniza a records.json y genera copias diarias fechadas."""
@@ -370,6 +375,31 @@ def restore_full_backup_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         "records_restored": records_restored,
         "total_current_records": len(load_records())
     }
+
+def delete_record(record_id: str) -> bool:
+    """Elimina una planilla por ID o solicitud_num de la base de datos SQLite y sincroniza el espejo JSON."""
+    ensure_data_dir()
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM records WHERE id = ? OR solicitud_num = ?;", (record_id, record_id))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    backup_data_mirror()
+    return affected > 0
+
+def clear_all_records() -> int:
+    """Elimina todas las planillas de prueba de la base de datos SQLite y vacía el espejo records.json."""
+    ensure_data_dir()
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM records;")
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    backup_data_mirror()
+    return affected
+
 
 # ==========================================
 # CONFIGURACIONES (SETTINGS)

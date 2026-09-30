@@ -395,6 +395,28 @@ export async function resendRecordEmail(recordId, recipientEmail) {
   return data;
 }
 
+export async function deleteRecord(recordId) {
+  const res = await authFetch(`${API_BASE}/records/${encodeURIComponent(recordId)}`, {
+    method: 'DELETE',
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al eliminar planilla');
+  }
+  return data;
+}
+
+export async function clearAllRecords() {
+  const res = await authFetch(`${API_BASE}/records/clear-all`, {
+    method: 'POST',
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Error al limpiar planillas');
+  }
+  return data;
+}
+
 export async function getNotifications() {
   const res = await authFetch(`${API_BASE}/notifications`);
   const data = await res.json();

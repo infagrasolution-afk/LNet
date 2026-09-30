@@ -64,6 +64,7 @@ import {
   downloadFullSystemBackup,
   downloadSqliteDatabase,
   restoreSystemBackup,
+  clearAllRecords,
 } from '../services/api';
 
 export default function AdminPanel() {
@@ -75,6 +76,7 @@ export default function AdminPanel() {
 
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(false);
+  const [clearingRecords, setClearingRecords] = useState(false);
 
   // New User Dialog State
   const [openNewUserModal, setOpenNewUserModal] = useState(false);
@@ -90,6 +92,32 @@ export default function AdminPanel() {
   const [restoringBackup, setRestoringBackup] = useState(false);
 
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+
+  const handleClearAllTestRecords = async () => {
+    const confirm = window.confirm(
+      "¿Está seguro de que desea eliminar todas las planillas de prueba del sistema?\n\nEsta acción vaciará el historial para dejar el sistema limpio y listo para las planillas reales en campo.\n\nLos usuarios registrados y los materiales del inventario NO se verán afectados."
+    );
+    if (!confirm) return;
+
+    setClearingRecords(true);
+    try {
+      const res = await clearAllRecords();
+      setToast({
+        open: true,
+        message: res.message || 'Se eliminaron las planillas con éxito. El sistema ha quedado listo para planillas reales.',
+        severity: 'success',
+      });
+      loadData();
+    } catch (err) {
+      setToast({
+        open: true,
+        message: err.message || 'Error al eliminar planillas',
+        severity: 'error',
+      });
+    } finally {
+      setClearingRecords(false);
+    }
+  };
 
   const handleRestoreFile = async (e) => {
     const file = e.target.files?.[0];
@@ -828,6 +856,52 @@ export default function AdminPanel() {
             </Card>
           </Grid>
         </Grid>
+
+        {/* Limpieza de Planillas de Prueba */}
+        <Box
+          sx={{
+            mt: 3,
+            p: 2.5,
+            backgroundColor: 'rgba(239, 68, 68, 0.07)',
+            borderRadius: 2.5,
+            border: '1px dashed rgba(239, 68, 68, 0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 2,
+          }}
+        >
+          <Box sx={{ maxWidth: { xs: '100%', md: '75%' } }}>
+            <Typography variant="subtitle2" sx={{ color: '#f87171', fontWeight: 800, fontSize: '0.95rem' }}>
+              Limpieza y Puesta a Punto (Vaciar Planillas de Prueba)
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+              Elimina todas las planillas registradas (datos de prueba/falsos) para dejar el historial completamente en blanco y listo para las planillas reales de los técnicos en campo. Los usuarios, contraseñas y catálogo de materiales se mantendrán intactos.
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            color="error"
+            disabled={clearingRecords}
+            onClick={handleClearAllTestRecords}
+            startIcon={clearingRecords ? <CircularProgress size={16} color="inherit" /> : <DeleteIcon />}
+            sx={{
+              borderColor: '#ef4444',
+              color: '#f87171',
+              fontWeight: 700,
+              textTransform: 'none',
+              px: 2.5,
+              py: 1,
+              '&:hover': {
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                borderColor: '#dc2626',
+              },
+            }}
+          >
+            {clearingRecords ? 'Limpiando base de datos...' : 'Vaciar Planillas de Prueba'}
+          </Button>
+        </Box>
       </Paper>
 
       {/* Toast Notification */}

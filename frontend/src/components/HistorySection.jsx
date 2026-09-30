@@ -43,9 +43,11 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 import {
   getRecords,
+  deleteRecord,
   downloadRecordsExcel,
   downloadNetunoIndividualExcel,
   downloadNetunoRelacionExcel,
@@ -53,7 +55,7 @@ import {
   getAttachmentUrl,
 } from '../services/api';
 
-function RecordRow({ record, isAdmin }) {
+function RecordRow({ record, isAdmin, onRecordDeleted }) {
   const [open, setOpen] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const executedItems = record.activities ? record.activities.filter((a) => a.checked) : [];
@@ -126,6 +128,34 @@ function RecordRow({ record, isAdmin }) {
                 PDF
               </Button>
             </Tooltip>
+
+            {isAdmin && (
+              <Tooltip title="Eliminar planilla (Admin)">
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (window.confirm(`¿Está seguro de que desea eliminar la planilla #${record.solicitud_num}?`)) {
+                      try {
+                        await deleteRecord(record.id);
+                        if (onRecordDeleted) onRecordDeleted();
+                      } catch (err) {
+                        alert(`Error al eliminar: ${err.message}`);
+                      }
+                    }
+                  }}
+                  sx={{
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: 1,
+                    p: 0.5,
+                    '&:hover': { backgroundColor: 'rgba(239, 68, 68, 0.15)' },
+                  }}
+                >
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
           </Box>
         </TableCell>
       </TableRow>
@@ -704,7 +734,7 @@ export default function HistorySection({ currentUser }) {
               </TableHead>
               <TableBody>
                 {filteredRecords.map((rec) => (
-                  <RecordRow key={rec.id} record={rec} isAdmin={isAdmin} />
+                  <RecordRow key={rec.id} record={rec} isAdmin={isAdmin} onRecordDeleted={loadHistory} />
                 ))}
               </TableBody>
             </Table>

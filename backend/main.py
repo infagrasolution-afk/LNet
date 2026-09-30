@@ -1113,6 +1113,20 @@ def resend_record_email(record_id: str, payload: dict = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al enviar correo por Gmail: {str(e)}")
 
+@app.delete("/api/records/{record_id}")
+def delete_single_record(record_id: str):
+    """Elimina una planilla específica por su ID o Solicitud."""
+    success = store.delete_record(record_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Planilla no encontrada para eliminar.")
+    return {"message": f"Planilla {record_id} eliminada con éxito."}
+
+@app.post("/api/records/clear-all")
+def clear_all_test_records():
+    """Elimina todas las planillas de prueba de la base de datos y vacía records.json."""
+    count = store.clear_all_records()
+    return {"message": f"Se eliminaron {count} planillas con éxito. El sistema ha quedado listo para planillas reales.", "deleted_count": count}
+
 # ==========================================
 # MOUNT REACT FRONTEND STATIC FILES
 # ==========================================
