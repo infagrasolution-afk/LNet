@@ -38,8 +38,20 @@ import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import DrawIcon from '@mui/icons-material/Draw';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
 
-import { getRecords, downloadRecordsExcel, openRecordPdf, getAttachmentUrl } from '../services/api';
+import {
+  getRecords,
+  downloadRecordsExcel,
+  downloadNetunoIndividualExcel,
+  downloadNetunoRelacionExcel,
+  openRecordPdf,
+  getAttachmentUrl,
+} from '../services/api';
 
 function RecordRow({ record, isAdmin }) {
   const [open, setOpen] = useState(false);
@@ -69,12 +81,32 @@ function RecordRow({ record, isAdmin }) {
         <TableCell>{record.created_by}</TableCell>
         <TableCell>{record.created_at}</TableCell>
         <TableCell align="center">
-          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-            <Tooltip title="Descargar esta planilla en formato Excel">
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Tooltip title="Presupuesto Individual NetUno (.xlsx con plantilla oficial, fórmulas y materiales)">
+              <Button
+                variant="contained"
+                size="small"
+                sx={{
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  textTransform: 'none',
+                  '&:hover': { backgroundColor: '#0369a1' },
+                }}
+                startIcon={<ReceiptLongIcon />}
+                onClick={() => downloadNetunoIndividualExcel(record.id)}
+              >
+                NetUno
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Descargar planilla completa en formato Excel estándar">
               <Button
                 variant="outlined"
                 size="small"
                 color="success"
+                sx={{ fontSize: '0.75rem', textTransform: 'none' }}
                 startIcon={<FileDownloadIcon />}
                 onClick={() => downloadRecordsExcel(null, record.id)}
               >
@@ -87,6 +119,7 @@ function RecordRow({ record, isAdmin }) {
                 variant="outlined"
                 size="small"
                 color="primary"
+                sx={{ fontSize: '0.75rem', textTransform: 'none' }}
                 startIcon={<PictureAsPdfIcon />}
                 onClick={() => openRecordPdf(record.id, false)}
               >
@@ -101,6 +134,42 @@ function RecordRow({ record, isAdmin }) {
         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box sx={{ margin: 2, p: 2.5, backgroundColor: 'rgba(15, 23, 42, 0.65)', borderRadius: 3, border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              {/* Quick NetUno Individual Export banner */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  p: 1.5,
+                  mb: 2.5,
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                  border: '1px solid rgba(2, 132, 199, 0.25)',
+                  flexWrap: 'wrap',
+                  gap: 1.5,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <ReceiptLongIcon sx={{ color: '#38bdf8' }} />
+                  <Typography variant="body2" sx={{ color: '#e0f2fe', fontWeight: 600 }}>
+                    Presupuesto Individual NetUno para Solicitud #{record.solicitud_num}
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  size="small"
+                  sx={{
+                    backgroundColor: '#0284c7',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    '&:hover': { backgroundColor: '#0369a1' },
+                  }}
+                  startIcon={<FileDownloadIcon />}
+                  onClick={() => downloadNetunoIndividualExcel(record.id)}
+                >
+                  Descargar Presupuesto (.xlsx)
+                </Button>
+              </Box>
               {/* GPS & Signature Indicators */}
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
                 {record.gps_lat && record.gps_lng && (
@@ -388,14 +457,20 @@ export default function HistorySection({ currentUser }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
 
   const isAdmin = currentUser.role === 'admin';
 
-  const loadRecordsData = async () => {
+  const loadRecordsData = async (start = startDate, end = endDate) => {
     setLoading(true);
     try {
-      const data = await getRecords(isAdmin ? null : currentUser.username);
+      const data = await getRecords(
+        isAdmin ? null : currentUser.username,
+        start || null,
+        end || null
+      );
       setRecords(data);
     } catch (err) {
       setToast({ open: true, message: err.message || 'Error al cargar registros', severity: 'error' });
@@ -408,6 +483,24 @@ export default function HistorySection({ currentUser }) {
     loadRecordsData();
   }, [currentUser]);
 
+  const handleApplyFilter = () => {
+    if (startDate && endDate && startDate > endDate) {
+      setToast({
+        open: true,
+        message: 'La fecha de inicio no puede ser posterior a la fecha de fin.',
+        severity: 'warning',
+      });
+      return;
+    }
+    loadRecordsData(startDate, endDate);
+  };
+
+  const handleClearFilter = () => {
+    setStartDate('');
+    setEndDate('');
+    loadRecordsData('', '');
+  };
+
   const filteredRecords = records.filter(
     (r) =>
       r.solicitud_num?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -418,6 +511,7 @@ export default function HistorySection({ currentUser }) {
   return (
     <Container maxWidth="lg" sx={{ mt: { xs: 2, sm: 4 }, mb: { xs: 4, sm: 6 }, px: { xs: 1.5, sm: 3 } }}>
       <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, borderRadius: { xs: 2, sm: 3 } }}>
+        {/* Header and Top Action Buttons */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <HistoryIcon sx={{ color: '#38bdf8', fontSize: { xs: 28, sm: 32 } }} />
@@ -427,39 +521,163 @@ export default function HistorySection({ currentUser }) {
               </Typography>
               <Typography variant="body2" sx={{ color: '#94a3b8' }}>
                 {isAdmin
-                  ? 'Visualización general de todos los registros de campo de la empresa'
+                  ? 'Visualización general de planillas cargadas con filtros por rango de fecha y reportes NetUno'
                   : `Planillas cargadas por el técnico: ${currentUser.name}`}
               </Typography>
             </Box>
           </Box>
 
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<FileDownloadIcon />}
-            onClick={() => downloadRecordsExcel(isAdmin ? null : currentUser.username)}
-            disabled={records.length === 0}
-            sx={{ fontWeight: 700 }}
-          >
-            Exportar Todo a Excel
-          </Button>
+          {/* Export Action Buttons */}
+          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+            {/* Relación NetUno Button */}
+            <Tooltip
+              title={
+                startDate && endDate
+                  ? `Generar sábana consolidada NetUno del ${startDate} al ${endDate} con fórmulas oficiales de IVA 16%, ISLR 2% y Ret. IVA 75%`
+                  : 'Generar sábana consolidada NetUno con todas las planillas cargadas (o aplique filtros de fecha para un período específico)'
+              }
+            >
+              <span>
+                <Button
+                  variant="contained"
+                  sx={{
+                    backgroundColor: '#0284c7',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    '&:hover': { backgroundColor: '#0369a1' },
+                  }}
+                  startIcon={<AssessmentIcon />}
+                  onClick={() => downloadNetunoRelacionExcel(startDate || null, endDate || null, isAdmin ? null : currentUser.username)}
+                  disabled={records.length === 0}
+                >
+                  Relación NetUno (Excel)
+                </Button>
+              </span>
+            </Tooltip>
+
+            {/* General Excel Export */}
+            <Tooltip title="Exportar listado completo de planillas y actividades a Excel">
+              <span>
+                <Button
+                  variant="outlined"
+                  color="success"
+                  startIcon={<FileDownloadIcon />}
+                  onClick={() => downloadRecordsExcel(isAdmin ? null : currentUser.username, null, startDate || null, endDate || null)}
+                  disabled={records.length === 0}
+                  sx={{ fontWeight: 700, textTransform: 'none' }}
+                >
+                  Reporte General (Excel)
+                </Button>
+              </span>
+            </Tooltip>
+          </Box>
         </Box>
 
         <Divider sx={{ mb: 3 }} />
 
-        {/* Search filter bar */}
-        <Box sx={{ mb: 3 }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Buscar por Nro. de Solicitud, Cliente o Técnico..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ color: '#94a3b8', mr: 1 }} />,
-            }}
-          />
+        {/* Search & Date Filter Panel */}
+        <Box
+          sx={{
+            p: 2,
+            mb: 3,
+            borderRadius: 2.5,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+          }}
+        >
+          {/* Quick Search */}
+          <Box sx={{ flex: '1 1 280px', minWidth: 240 }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Buscar por Nro. de Solicitud, Cliente o Técnico..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ color: '#94a3b8', mr: 1 }} />,
+              }}
+            />
+          </Box>
+
+          {/* Date Range: Fecha Inicio & Fecha Fin */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <TextField
+              label="Fecha Inicio"
+              type="date"
+              size="small"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 155 }}
+            />
+
+            <TextField
+              label="Fecha Fin"
+              type="date"
+              size="small"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 155 }}
+            />
+
+            <Button
+              variant="contained"
+              size="medium"
+              startIcon={<FilterAltIcon />}
+              onClick={handleApplyFilter}
+              sx={{
+                backgroundColor: '#0ea5e9',
+                fontWeight: 700,
+                textTransform: 'none',
+                '&:hover': { backgroundColor: '#0284c7' },
+              }}
+            >
+              Filtrar Fechas
+            </Button>
+
+            {(startDate || endDate) && (
+              <Button
+                variant="outlined"
+                size="medium"
+                startIcon={<RestartAltIcon />}
+                onClick={handleClearFilter}
+                sx={{
+                  color: '#94a3b8',
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  textTransform: 'none',
+                  '&:hover': { borderColor: '#ef4444', color: '#ef4444' },
+                }}
+              >
+                Limpiar Fechas
+              </Button>
+            )}
+          </Box>
         </Box>
+
+        {/* Active Filter Indicator Badge */}
+        {(startDate || endDate) && (
+          <Box sx={{ mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip
+              icon={<CalendarMonthIcon sx={{ color: '#38bdf8 !important' }} />}
+              label={`Período filtrado: ${startDate ? `Desde ${startDate}` : 'Desde el inicio'} ${endDate ? `hasta ${endDate}` : 'hasta hoy'} — Mostrando ${filteredRecords.length} planilla(s)`}
+              onDelete={handleClearFilter}
+              sx={{
+                backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                color: '#38bdf8',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+              }}
+            />
+          </Box>
+        )}
 
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>

@@ -25,8 +25,9 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 
-import { getRecords, downloadRecordsExcel, openRecordPdf, getInventory } from '../services/api';
+import { getRecords, downloadRecordsExcel, downloadNetunoIndividualExcel, openRecordPdf, getInventory } from '../services/api';
 
 export default function DashboardOverview({ currentUser, onNavigate }) {
   const [records, setRecords] = useState([]);
@@ -579,7 +580,17 @@ export default function DashboardOverview({ currentUser, onNavigate }) {
                         </Box>
 
                         <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Tooltip title="Descargar Excel">
+                          <Tooltip title="Presupuesto Individual NetUno (.xlsx)">
+                            <IconButton
+                              size="small"
+                              onClick={() => downloadNetunoIndividualExcel(rec.id)}
+                              sx={{ color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.3)' }}
+                            >
+                              <ReceiptLongIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+
+                          <Tooltip title="Descargar Excel Estándar">
                             <IconButton
                               size="small"
                               onClick={() => downloadRecordsExcel(null, rec.id)}

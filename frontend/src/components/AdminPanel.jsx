@@ -41,6 +41,9 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 
 import {
   getUsers,
@@ -53,12 +56,15 @@ import {
   saveSettings,
   testEmailConnection,
   downloadRecordsExcel,
+  downloadNetunoRelacionExcel,
 } from '../services/api';
 
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
   const [settings, setSettingsData] = useState({ gmail_user: '', gmail_app_password: '', default_recipients: '' });
   const [selectedExportUser, setSelectedExportUser] = useState('ALL');
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
 
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(false);
@@ -497,14 +503,15 @@ export default function AdminPanel() {
               Descarga y Exportación de Información Guardada
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Exportar las planillas y registros de actividades guardados por los usuarios en formato Excel o PDF
+              Exportar planillas y actividades filtradas por usuario y por rango de fechas (Reporte General o Relación NetUno)
             </Typography>
           </Box>
         </Box>
 
         <Divider sx={{ mb: 3 }} />
 
-        <Grid container spacing={3} alignItems="center">
+        <Grid container spacing={2.5} alignItems="center">
+          {/* User selector */}
           <Grid item xs={12} sm={6} md={4}>
             <FormControl fullWidth size="small">
               <InputLabel>Seleccionar Usuario a Exportar</InputLabel>
@@ -523,8 +530,56 @@ export default function AdminPanel() {
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={8}>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          {/* Fecha Inicio */}
+          <Grid item xs={12} sm={3} md={4}>
+            <TextField
+              fullWidth
+              label="Fecha Inicio (Desde)"
+              type="date"
+              size="small"
+              value={exportStartDate}
+              onChange={(e) => setExportStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+
+          {/* Fecha Fin */}
+          <Grid item xs={12} sm={3} md={4}>
+            <TextField
+              fullWidth
+              label="Fecha Fin (Hasta)"
+              type="date"
+              size="small"
+              value={exportEndDate}
+              onChange={(e) => setExportEndDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+
+          {/* Active Period Indicator */}
+          {(exportStartDate || exportEndDate) && (
+            <Grid item xs={12}>
+              <Chip
+                icon={<CalendarMonthIcon sx={{ color: '#38bdf8 !important' }} />}
+                label={`Filtro de período para exportación: ${exportStartDate ? `Desde ${exportStartDate}` : 'Desde el inicio'} ${exportEndDate ? `hasta ${exportEndDate}` : 'hasta hoy'}`}
+                onDelete={() => {
+                  setExportStartDate('');
+                  setExportEndDate('');
+                }}
+                sx={{
+                  backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                  color: '#38bdf8',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  fontWeight: 600,
+                }}
+              />
+            </Grid>
+          )}
+
+          {/* Action buttons */}
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* General Excel Report */}
               <Button
                 variant="contained"
                 color="success"
@@ -532,13 +587,63 @@ export default function AdminPanel() {
                 startIcon={<FileDownloadIcon />}
                 onClick={() => {
                   const target = selectedExportUser === 'ALL' ? null : selectedExportUser;
-                  downloadRecordsExcel(target);
-                  setToast({ open: true, message: 'Generando reporte en Excel (.csv)...', severity: 'info' });
+                  downloadRecordsExcel(target, null, exportStartDate || null, exportEndDate || null);
+                  setToast({
+                    open: true,
+                    message: `Generando Reporte General Excel${exportStartDate && exportEndDate ? ` (${exportStartDate} al ${exportEndDate})` : ''}...`,
+                    severity: 'info',
+                  });
                 }}
-                sx={{ fontWeight: 'bold' }}
+                sx={{ fontWeight: 'bold', textTransform: 'none' }}
               >
-                Descargar en Excel (.csv)
+                Descargar Reporte General (.xlsx)
               </Button>
+
+              {/* Relación NetUno Report */}
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<AssessmentIcon />}
+                onClick={() => {
+                  const target = selectedExportUser === 'ALL' ? null : selectedExportUser;
+                  downloadNetunoRelacionExcel(exportStartDate || null, exportEndDate || null, target);
+                  setToast({
+                    open: true,
+                    message: `Generando Relación NetUno Excel${exportStartDate && exportEndDate ? ` (${exportStartDate} al ${exportEndDate})` : ''}...`,
+                    severity: 'info',
+                  });
+                }}
+                sx={{
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  fontWeight: 'bold',
+                  textTransform: 'none',
+                  '&:hover': { backgroundColor: '#0369a1' },
+                }}
+              >
+                Descargar Relación NetUno (.xlsx)
+              </Button>
+
+              {/* Reset Dates Button */}
+              {(exportStartDate || exportEndDate) && (
+                <Button
+                  variant="outlined"
+                  size="large"
+                  startIcon={<RestartAltIcon />}
+                  onClick={() => {
+                    setExportStartDate('');
+                    setExportEndDate('');
+                  }}
+                  sx={{
+                    color: '#94a3b8',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    textTransform: 'none',
+                    '&:hover': { borderColor: '#ef4444', color: '#ef4444' },
+                  }}
+                >
+                  Limpiar Fechas
+                </Button>
+              )}
             </Box>
           </Grid>
         </Grid>

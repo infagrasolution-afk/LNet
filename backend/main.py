@@ -4,15 +4,26 @@ import csv
 import io
 import json
 import mimetypes
+import logging
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Depends, Body, Response, Request, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Depends, Body, Response, Request, UploadFile, File, Form, Header
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 import store
 import mailer
+import auth
+import reports
+
+
+# Configure structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("lnet")
 
 app = FastAPI(title="LNet Backend API")
 
@@ -24,6 +35,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Models
 class LoginRequest(BaseModel):
@@ -109,24 +121,43 @@ def startup_event():
 
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
-    users = store.load_users()
     username_clean = req.username.strip().lower()
-    
-    user = next((u for u in users if u["username"].lower() == username_clean), None)
+    user = store.get_user_by_username(username_clean)
     if not user:
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
         
-    if user["password"] != req.password:
+    is_valid, needs_migration = auth.verify_and_check_migration(req.password, user["password"])
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
         
+    # Auto-migración transparente y no disruptiva de contraseñas de texto plano a bcrypt
+    if needs_migration:
+        try:
+            hashed_pw = auth.hash_password(req.password)
+            store.update_user_password(user["username"], hashed_pw)
+            logger.info(f"Contraseña de '{user['username']}' migrada automáticamente a hash bcrypt.")
+        except Exception as e:
+            logger.error(f"Error al migrar contraseña para {user['username']}: {e}")
+
     if user.get("status") == "bloqueado":
         raise HTTPException(
             status_code=403, 
             detail="Usuario bloqueado. Contacte al administrador del sistema."
         )
 
+    # Generar token JWT con 24 horas de validez
+    token_payload = {
+        "sub": user["id"],
+        "username": user["username"],
+        "name": user["name"],
+        "role": user["role"]
+    }
+    access_token = auth.create_access_token(token_payload)
+
     return {
         "message": "Inicio de sesión exitoso",
+        "access_token": access_token,
+        "token_type": "bearer",
         "user": {
             "id": user["id"],
             "name": user["name"],
@@ -137,14 +168,28 @@ def login(req: LoginRequest):
         }
     }
 
+@app.get("/api/auth/me")
+def get_current_user_profile(current_user: dict = Depends(auth.get_current_user)):
+    """Valida el token de sesión y retorna el perfil actual del usuario autenticado."""
+    user = store.get_user_by_username(current_user.get("username", ""))
+    if not user or user.get("status") == "bloqueado":
+        raise HTTPException(status_code=401, detail="Sesión no válida o usuario bloqueado.")
+    return {
+        "id": user["id"],
+        "name": user["name"],
+        "username": user["username"],
+        "cedula": user["cedula"],
+        "role": user["role"],
+        "status": user["status"]
+    }
+
 # ==========================================
 # ADMIN USER MANAGEMENT
 # ==========================================
 
 @app.get("/api/users")
-def get_users():
+def get_users(_admin: dict = Depends(auth.require_admin)):
     users = store.load_users()
-    # Don't send passwords in list
     clean_users = [
         {
             "id": u["id"],
@@ -160,7 +205,7 @@ def get_users():
     return clean_users
 
 @app.post("/api/users")
-def create_user(req: UserCreateRequest):
+def create_user(req: UserCreateRequest, _admin: dict = Depends(auth.require_admin)):
     users = store.load_users()
     
     # Format username if not provided: initial + surname
@@ -178,42 +223,41 @@ def create_user(req: UserCreateRequest):
     if any(u["username"].lower() == gen_username for u in users):
         raise HTTPException(status_code=400, detail=f"El nombre de usuario '{gen_username}' ya existe.")
 
-    # Password defaults to cedula if empty
+    # Contraseña por defecto es la cédula si no se especifica, hasheada con bcrypt
     gen_password = req.password if req.password else req.cedula.strip()
+    hashed_password = auth.hash_password(gen_password)
 
     new_user = {
         "id": str(uuid.uuid4()),
         "name": req.name.strip(),
         "cedula": req.cedula.strip(),
         "username": gen_username,
-        "password": gen_password,
+        "password": hashed_password,
         "role": req.role,
         "status": "activo",
         "created_at": datetime.now().isoformat()
     }
     
-    users.append(new_user)
-    store.save_users(users)
-    return {"message": "Usuario creado exitosamente", "user": new_user}
+    store.create_user_direct(new_user)
+    # No exponer el hash de la contraseña en la respuesta
+    safe_user = {k: v for k, v in new_user.items() if k != "password"}
+    return {"message": "Usuario creado exitosamente", "user": safe_user}
 
 @app.put("/api/users/{username}/status")
-def update_user_status(username: str, req: UserStatusRequest):
-    users = store.load_users()
-    user = next((u for u in users if u["username"].lower() == username.lower()), None)
+def update_user_status(username: str, req: UserStatusRequest, _admin: dict = Depends(auth.require_admin)):
+    user = store.get_user_by_username(username)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
         
     if user["role"] == "admin" and req.status == "bloqueado":
         raise HTTPException(status_code=400, detail="No se puede bloquear al usuario administrador principal.")
 
-    user["status"] = req.status
-    store.save_users(users)
+    store.update_user_status_direct(username, req.status)
     return {"message": f"Estado de usuario actualizado a {req.status}", "status": req.status}
 
 @app.put("/api/users/{username}/role")
-def update_user_role(username: str, req: UserRoleRequest):
-    users = store.load_users()
-    user = next((u for u in users if u["username"].lower() == username.lower()), None)
+def update_user_role(username: str, req: UserRoleRequest, _admin: dict = Depends(auth.require_admin)):
+    user = store.get_user_by_username(username)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
@@ -224,33 +268,29 @@ def update_user_role(username: str, req: UserRoleRequest):
     if username.lower() == "linfante" and req.role != "admin":
         raise HTTPException(status_code=400, detail="No se puede cambiar el rol del administrador principal.")
 
-    user["role"] = req.role
-    store.save_users(users)
+    store.update_user_role_direct(username, req.role)
     return {"message": f"Rol de {username} actualizado a {req.role}", "role": req.role}
 
 @app.post("/api/users/{username}/reset-password")
-def reset_password(username: str):
-    users = store.load_users()
-    user = next((u for u in users if u["username"].lower() == username.lower()), None)
+def reset_password(username: str, _admin: dict = Depends(auth.require_admin)):
+    user = store.get_user_by_username(username)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
-    user["password"] = user["cedula"]
-    store.save_users(users)
+    hashed_pw = auth.hash_password(user["cedula"])
+    store.update_user_password(username, hashed_pw)
     return {"message": f"Contraseña de {username} restablecida a su número de cédula ({user['cedula']})."}
 
 @app.delete("/api/users/{username}")
-def delete_user(username: str):
-    users = store.load_users()
-    user = next((u for u in users if u["username"].lower() == username.lower()), None)
+def delete_user(username: str, _admin: dict = Depends(auth.require_admin)):
+    user = store.get_user_by_username(username)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
         
     if user["role"] == "admin":
         raise HTTPException(status_code=400, detail="No se puede eliminar al usuario administrador principal.")
 
-    filtered_users = [u for u in users if u["username"].lower() != username.lower()]
-    store.save_users(filtered_users)
+    store.delete_user_direct(username)
     return {"message": f"Usuario {username} eliminado exitosamente."}
 
 # ==========================================
@@ -258,21 +298,45 @@ def delete_user(username: str):
 # ==========================================
 
 @app.get("/api/settings")
-def get_settings():
-    return store.load_settings()
+def get_settings(_admin: dict = Depends(auth.require_admin)):
+    raw = store.load_settings()
+    has_pw = bool(raw.get("gmail_app_password"))
+    # Enmascarar contraseña para no exponer secretos en texto plano al frontend
+    return {
+        "gmail_user": raw.get("gmail_user", ""),
+        "gmail_app_password": "●●●●●●●●" if has_pw else "",
+        "is_configured": bool(raw.get("gmail_user") and has_pw),
+        "default_recipients": raw.get("default_recipients", "")
+    }
 
 @app.post("/api/settings")
-def save_settings(req: SettingsRequest):
+def save_settings(req: SettingsRequest, _admin: dict = Depends(auth.require_admin)):
+    curr_settings = store.load_settings()
+    new_pw = req.gmail_app_password.strip()
+    # Si viene enmascarada o vacía pero ya existía una, mantener la contraseña actual
+    if not new_pw or new_pw == "●●●●●●●●":
+        final_pw = curr_settings.get("gmail_app_password", "")
+    else:
+        final_pw = new_pw
+
     settings = {
         "gmail_user": req.gmail_user.strip(),
-        "gmail_app_password": req.gmail_app_password.strip(),
+        "gmail_app_password": final_pw,
         "default_recipients": req.default_recipients.strip() if req.default_recipients else ""
     }
     store.save_settings(settings)
-    return {"message": "Configuración guardada exitosamente", "settings": settings}
+    return {
+        "message": "Configuración guardada exitosamente",
+        "settings": {
+            "gmail_user": settings["gmail_user"],
+            "gmail_app_password": "●●●●●●●●" if settings["gmail_app_password"] else "",
+            "is_configured": bool(settings["gmail_user"] and settings["gmail_app_password"]),
+            "default_recipients": settings["default_recipients"]
+        }
+    }
 
 @app.post("/api/test-email")
-def test_email(req: TestEmailRequest):
+def test_email(req: TestEmailRequest, _admin: dict = Depends(auth.require_admin)):
     settings = store.load_settings()
     sender = settings.get("gmail_user")
     app_pw = settings.get("gmail_app_password")
@@ -316,7 +380,7 @@ def get_inventory():
     return store.get_inventory()
 
 @app.post("/api/inventory/items")
-def create_inventory_item(req: InventoryItemCreateRequest):
+def create_inventory_item(req: InventoryItemCreateRequest, _admin: dict = Depends(auth.require_admin)):
     """Agrega un nuevo producto al inventario."""
     try:
         item = store.add_inventory_item(req.dict())
@@ -325,7 +389,7 @@ def create_inventory_item(req: InventoryItemCreateRequest):
         raise HTTPException(status_code=400, detail=f"Error al crear producto: {str(e)}")
 
 @app.put("/api/inventory/items/{item_id}")
-def update_inventory_item(item_id: str, req: InventoryItemUpdateRequest):
+def update_inventory_item(item_id: str, req: InventoryItemUpdateRequest, _admin: dict = Depends(auth.require_admin)):
     """Actualiza la información descriptiva de un producto."""
     try:
         res = store.update_inventory_item(item_id, req.dict())
@@ -334,7 +398,7 @@ def update_inventory_item(item_id: str, req: InventoryItemUpdateRequest):
         raise HTTPException(status_code=400, detail=f"Error al actualizar producto: {str(e)}")
 
 @app.delete("/api/inventory/items/{item_id}")
-def delete_inventory_item(item_id: str):
+def delete_inventory_item(item_id: str, _admin: dict = Depends(auth.require_admin)):
     """Elimina un producto del catálogo de inventario."""
     try:
         store.delete_inventory_item(item_id)
@@ -343,7 +407,7 @@ def delete_inventory_item(item_id: str):
         raise HTTPException(status_code=400, detail=f"Error al eliminar producto: {str(e)}")
 
 @app.post("/api/inventory/adjust")
-def adjust_inventory_stock(req: InventoryAdjustRequest):
+def adjust_inventory_stock(req: InventoryAdjustRequest, current_user: dict = Depends(auth.get_current_user)):
     """Ajusta o repone stock de un material y registra la auditoría."""
     try:
         res = store.adjust_inventory_stock(
@@ -351,7 +415,7 @@ def adjust_inventory_stock(req: InventoryAdjustRequest):
             quantity_delta=req.quantity_delta,
             movement_type=req.movement_type or "ajuste",
             reference=req.reference or "Ajuste manual",
-            created_by=req.created_by or "Admin",
+            created_by=current_user.get("name") or req.created_by or "Admin",
             notes=req.notes or ""
         )
         return {"message": "Stock actualizado con éxito.", "data": res}
@@ -368,22 +432,68 @@ def get_inventory_movements(limit: int = 150):
 # ==========================================
 
 @app.get("/api/records")
-def get_records(username: Optional[str] = None):
-    return store.load_records(username=username)
+def get_records(
+    username: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """Retorna las planillas registradas, opcionalmente filtradas por técnico y rango de fechas."""
+    return store.load_records(username=username, start_date=start_date, end_date=end_date)
+
+@app.get("/api/records/{record_id}/export/netuno-individual")
+def export_netuno_individual_excel(record_id: str):
+    """Genera y descarga el formato individual de presupuesto NetUno para un ticket específico."""
+    records = store.load_records()
+    record = next((r for r in records if r["id"] == record_id or str(r.get("solicitud_num")) == str(record_id)), None)
+    if not record:
+        raise HTTPException(status_code=404, detail="Planilla o ticket no encontrado.")
+
+    excel_output = reports.generate_netuno_individual_excel(record)
+    solicitud = record.get("solicitud_num", record_id)
+    filename = f"Presupuesto_NetUno_Ticket_{solicitud}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    return Response(
+        content=excel_output.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+@app.get("/api/records/export/netuno-relacion")
+def export_netuno_relacion_excel(
+    username: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """Genera y descarga la sábana consolidada 'Relación de Presupuestos' de NetUno."""
+    records = store.load_records(username=username, start_date=start_date, end_date=end_date)
+    excel_output = reports.generate_netuno_relacion_excel(records, start_date=start_date, end_date=end_date)
+    
+    date_suffix = f"_{start_date}_a_{end_date}" if start_date and end_date else f"_{datetime.now().strftime('%Y%m%d')}"
+    filename = f"Relacion_Presupuestos_NetUno{date_suffix}.xlsx"
+    return Response(
+        content=excel_output.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 @app.get("/api/records/export/excel")
-def export_records_excel(username: Optional[str] = None, record_id: Optional[str] = None):
-    records = store.load_records(username=username)
+def export_records_excel(
+    username: Optional[str] = None,
+    record_id: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    records = store.load_records(username=username, start_date=start_date, end_date=end_date)
     if record_id:
-        records = [r for r in records if r.get("id") == record_id]
+        records = [r for r in records if r.get("id") == record_id or str(r.get("solicitud_num")) == str(record_id)]
 
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Reporte LNet"
+
 
     # Header style
     header_fill = PatternFill(start_color="01579B", end_color="01579B", fill_type="solid")
@@ -452,6 +562,14 @@ def export_records_excel(username: Optional[str] = None, record_id: Optional[str
 
         ws.row_dimensions[row_idx].height = max(30, len(executed_acts) * 18)
 
+    # If no records found in the date range, display informative row
+    if not records:
+        empty_cell = ws.cell(row=2, column=1, value="No se encontraron planillas registradas en el período seleccionado.")
+        empty_cell.alignment = Alignment(horizontal="center", vertical="center")
+        empty_cell.font = Font(name="Calibri", size=11, italic=True, color="666666")
+        ws.merge_cells("A2:G2")
+        ws.row_dimensions[2].height = 25
+
     # Auto-adjust column widths
     column_widths = {1: 16, 2: 30, 3: 16, 4: 22, 5: 50, 6: 25, 7: 35}
     for col_num, width in column_widths.items():
@@ -468,7 +586,16 @@ def export_records_excel(username: Optional[str] = None, record_id: Optional[str
     else:
         user_suffix = "_global"
 
-    filename = f"reporte_lnet{user_suffix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    if start_date and end_date:
+        date_suffix = f"_{start_date}_a_{end_date}"
+    elif start_date:
+        date_suffix = f"_desde_{start_date}"
+    elif end_date:
+        date_suffix = f"_hasta_{end_date}"
+    else:
+        date_suffix = ""
+
+    filename = f"reporte_lnet{user_suffix}{date_suffix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return Response(
         content=output.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -663,8 +790,16 @@ async def create_record(request: Request):
     if not client_name:
         raise HTTPException(status_code=400, detail="El Nombre / Razón Social es obligatorio.")
 
+    # Validate non-duplicate solicitud_num
+    if store.check_solicitud_exists(solicitud_num):
+        raise HTTPException(
+            status_code=400,
+            detail=f"La Solicitud #{solicitud_num} ya se encuentra registrada en el sistema. Verifique en el historial de planillas."
+        )
+
     record_id = str(uuid.uuid4())[:8].upper()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 
     # Save uploaded files if any
     saved_attachments = []

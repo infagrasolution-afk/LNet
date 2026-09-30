@@ -10,20 +10,48 @@ import HistorySection from './components/HistorySection';
 import InventorySection from './components/InventorySection';
 import AdminPanel from './components/AdminPanel';
 
-import { loginUser, saveRecord } from './services/api';
+import { loginUser, saveRecord, getCurrentUserProfile, getStoredUser, clearSession } from './services/api';
 
-// 10 minutes of inactivity limit in milliseconds
-const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
+// 15 minutes of inactivity limit in milliseconds
+const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(getStoredUser());
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'form' | 'history' | 'inventory' | 'admin'
   const [sessionMessage, setSessionMessage] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const inactivityTimerRef = useRef(null);
 
-  // On page load or refresh: always require login (do not restore session)
+  // Restaurar y validar sesión con el servidor al abrir o recargar
   useEffect(() => {
-    sessionStorage.clear();
+    let isMounted = true;
+    async function restoreSession() {
+      try {
+        const user = await getCurrentUserProfile();
+        if (isMounted) {
+          if (user) {
+            setCurrentUser(user);
+          } else {
+            setCurrentUser(null);
+          }
+        }
+      } catch (err) {
+        if (isMounted) setCurrentUser(null);
+      } finally {
+        if (isMounted) setCheckingAuth(false);
+      }
+    }
+    restoreSession();
+
+    const handleSessionExpired = () => {
+      handleLogout('Su sesión ha expirado. Por favor, ingrese de nuevo.');
+    };
+    window.addEventListener('lnet-session-expired', handleSessionExpired);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('lnet-session-expired', handleSessionExpired);
+    };
   }, []);
 
   const handleLogout = (reason = null) => {
@@ -31,7 +59,7 @@ export default function App() {
       clearTimeout(inactivityTimerRef.current);
     }
     setCurrentUser(null);
-    sessionStorage.clear();
+    clearSession();
     setSessionMessage(reason);
   };
 
@@ -41,6 +69,7 @@ export default function App() {
     setSessionMessage(null);
     setActiveTab('dashboard');
   };
+
 
   // Inactivity auto-logout tracker (10 minutes)
   useEffect(() => {

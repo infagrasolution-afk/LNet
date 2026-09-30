@@ -44,6 +44,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CameraCaptureModal from './CameraCaptureModal';
 import SignaturePad from './SignaturePad';
 import { compressImage } from '../utils/imageCompressor';
+import { getInventory } from '../services/api';
+
 
 const INITIAL_ACTIVITIES = [
   {
@@ -189,6 +191,128 @@ export default function FormSection({ currentUser, onSaveRecord }) {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
 
+  // Carga dinámica de materiales desde el catálogo centralizado de inventario
+  useEffect(() => {
+    async function loadLiveCatalog() {
+      try {
+        const inv = await getInventory();
+        if (inv && Array.isArray(inv) && inv.length > 0) {
+          const dynamicActs = [];
+          
+          // 1. Fibra Óptica (Item especial con selector de tipo drop)
+          const fibraInv = inv.find((i) => i.id === 'act-1' || i.code === 'INV-FIBRA-01' || i.name.toLowerCase().includes('fibra'));
+          dynamicActs.push({
+            id: fibraInv ? fibraInv.id : 'act-1',
+            inventory_id: fibraInv ? fibraInv.id : 'act-1',
+            code: fibraInv ? fibraInv.code : 'INV-FIBRA-01',
+            name: fibraInv ? fibraInv.name : 'Fibra Óptica',
+            description: fibraInv ? `${fibraInv.code} | ${fibraInv.name}` : 'INV-FIBRA-01 | Fibra Óptica (1H / 4H Drop)',
+            category: fibraInv?.category || 'Fibra Óptica',
+            unit: fibraInv?.unit || 'MTS',
+            stock: fibraInv?.stock ?? 0,
+            type: 'select',
+            selectOptions: [
+              '1H C/guía Negro',
+              '1H S/guía Negro',
+              '1H S/Blanco',
+              '1H Anti roedores',
+              '4H Redondo',
+            ],
+            detail: '1H C/guía Negro',
+            checked: false,
+            unid_mts: '',
+          });
+
+          // 2. Todos los demás materiales activos del inventario
+          inv.forEach((item) => {
+            if (item.id === (fibraInv?.id || 'act-1') || item.code === 'INV-FIBRA-01') return;
+            dynamicActs.push({
+              id: item.id,
+              inventory_id: item.id,
+              code: item.code,
+              name: item.name,
+              description: `${item.code} | ${item.name}`,
+              category: item.category || 'General',
+              unit: item.unit || 'UNID',
+              stock: item.stock ?? 0,
+              checked: false,
+              unid_mts: '',
+            });
+          });
+
+          // 3. Opciones especiales para tuberías y trabajos a medida
+          dynamicActs.push(
+            {
+              id: 'custom-tub-met',
+              name: 'TUBERIA METALICA CORRUGADA',
+              description: 'TUBERIA METALICA CORRUGADA (Indicar diámetro)',
+              category: 'Tuberías',
+              type: 'input_detail',
+              detail: '',
+              detailPlaceholder: 'Indicar diámetro...',
+              checked: false,
+              unid_mts: '',
+            },
+            {
+              id: 'custom-tub-plas',
+              name: 'TUBERIA PLASTICA CORRUGADA',
+              description: 'TUBERIA PLASTICA CORRUGADA (Indicar diámetro)',
+              category: 'Tuberías',
+              type: 'input_detail',
+              detail: '',
+              detailPlaceholder: 'Indicar diámetro...',
+              checked: false,
+              unid_mts: '',
+            },
+            {
+              id: 'custom-otro-1',
+              name: 'Otro (Indique y Detalle 1)',
+              description: 'Otro (Indique y Detalle)',
+              category: 'Otros',
+              type: 'input_detail',
+              detail: '',
+              detailPlaceholder: 'Especifique el material u otro trabajo...',
+              checked: false,
+              unid_mts: '',
+            },
+            {
+              id: 'custom-otro-2',
+              name: 'Otro (Indique y Detalle 2)',
+              description: 'Otro (Indique y Detalle)',
+              category: 'Otros',
+              type: 'input_detail',
+              detail: '',
+              detailPlaceholder: 'Especifique el material u otro trabajo...',
+              checked: false,
+              unid_mts: '',
+            }
+          );
+
+          // Si el técnico ya había marcado opciones en pantalla, conservarlas
+          setActivities((prevActs) => {
+            const currentCheckedMap = new Map();
+            prevActs.forEach((a) => {
+              if (a.checked || a.unid_mts || a.detail) {
+                currentCheckedMap.set(a.id, a);
+              }
+            });
+
+            return dynamicActs.map((act) => {
+              if (currentCheckedMap.has(act.id)) {
+                const prev = currentCheckedMap.get(act.id);
+                return { ...act, checked: prev.checked, unid_mts: prev.unid_mts, detail: prev.detail || act.detail };
+              }
+              return act;
+            });
+          });
+        }
+      } catch (err) {
+        console.warn('No se pudo sincronizar catálogo de inventario en vivo, usando inicial:', err);
+      }
+    }
+    loadLiveCatalog();
+  }, []);
+
   // Check for saved local draft on mount
   useEffect(() => {
     try {
@@ -203,6 +327,7 @@ export default function FormSection({ currentUser, onSaveRecord }) {
       console.warn('Error reading form draft:', e);
     }
   }, []);
+
 
   // Auto-save form draft to localStorage
   useEffect(() => {
@@ -677,9 +802,38 @@ export default function FormSection({ currentUser, onSaveRecord }) {
                   </TableCell>
 
                   <TableCell>
-                    <Typography variant="body2" fontWeight={row.checked ? 600 : 400}>
-                      {row.description}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                      <Typography variant="body2" fontWeight={row.checked ? 600 : 400}>
+                        {row.description}
+                      </Typography>
+                      {row.category && (
+                        <Chip
+                          label={row.category}
+                          size="small"
+                          sx={{
+                            height: 20,
+                            fontSize: '0.68rem',
+                            backgroundColor: 'rgba(56, 189, 248, 0.08)',
+                            color: '#38bdf8',
+                            border: '1px solid rgba(56, 189, 248, 0.2)',
+                          }}
+                        />
+                      )}
+                      {row.stock !== undefined && row.stock !== null && (
+                        <Chip
+                          label={`Stock: ${row.stock} ${row.unit || 'UNID'}`}
+                          size="small"
+                          sx={{
+                            height: 20,
+                            fontSize: '0.68rem',
+                            backgroundColor: row.stock > 5 ? 'rgba(74, 222, 128, 0.08)' : 'rgba(239, 68, 68, 0.1)',
+                            color: row.stock > 5 ? '#4ade80' : '#f87171',
+                            border: `1px solid ${row.stock > 5 ? 'rgba(74, 222, 128, 0.2)' : 'rgba(239, 68, 68, 0.3)'}`,
+                          }}
+                        />
+                      )}
+                    </Box>
+
 
                     {/* Sub-selector for Fiber */}
                     {row.type === 'select' && row.checked && (

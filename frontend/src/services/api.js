@@ -1,5 +1,69 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
+const TOKEN_KEY = 'lnet_token';
+const USER_KEY = 'lnet_user';
+const OFFLINE_QUEUE_KEY = 'lnet_offline_records_queue';
+
+// ==========================================
+// TOKEN & SESSION MANAGEMENT
+// ==========================================
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+}
+
+export function getStoredUser() {
+  const userStr = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY);
+  if (!userStr) return null;
+  try {
+    return JSON.parse(userStr);
+  } catch (e) {
+    return null;
+  }
+}
+
+export function setSession(token, user) {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  }
+  if (user) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+}
+
+export function clearSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
+}
+
+/**
+ * Función base para peticiones HTTP con inyección automática de cabeceras Bearer JWT
+ */
+async function authFetch(url, options = {}) {
+  const token = getToken();
+  const headers = { ...(options.headers || {}) };
+
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 401) {
+    // Si el token expiró o es inválido, limpiar sesión y notificar
+    clearSession();
+    window.dispatchEvent(new CustomEvent('lnet-session-expired'));
+  }
+
+  return response;
+}
+
+// ==========================================
+// AUTHENTICATION
+// ==========================================
+
 export async function loginUser(username, password) {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
@@ -10,11 +74,32 @@ export async function loginUser(username, password) {
   if (!res.ok) {
     throw new Error(data.detail || 'Error al iniciar sesión');
   }
+
+  if (data.access_token) {
+    setSession(data.access_token, data.user);
+  }
   return data;
 }
 
+export async function getCurrentUserProfile() {
+  const token = getToken();
+  if (!token) return null;
+
+  const res = await authFetch(`${API_BASE}/auth/me`);
+  if (!res.ok) {
+    return null;
+  }
+  const user = await res.json();
+  setSession(token, user);
+  return user;
+}
+
+// ==========================================
+// USER MANAGEMENT (ADMIN ONLY)
+// ==========================================
+
 export async function getUsers() {
-  const res = await fetch(`${API_BASE}/users`);
+  const res = await authFetch(`${API_BASE}/users`);
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.detail || 'Error al cargar usuarios');
@@ -23,7 +108,7 @@ export async function getUsers() {
 }
 
 export async function createUser(userData) {
-  const res = await fetch(`${API_BASE}/users`, {
+  const res = await authFetch(`${API_BASE}/users`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(userData),
@@ -36,7 +121,7 @@ export async function createUser(userData) {
 }
 
 export async function updateUserStatus(username, status) {
-  const res = await fetch(`${API_BASE}/users/${username}/status`, {
+  const res = await authFetch(`${API_BASE}/users/${username}/status`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
@@ -49,7 +134,7 @@ export async function updateUserStatus(username, status) {
 }
 
 export async function updateUserRole(username, role) {
-  const res = await fetch(`${API_BASE}/users/${username}/role`, {
+  const res = await authFetch(`${API_BASE}/users/${username}/role`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role }),
@@ -62,7 +147,7 @@ export async function updateUserRole(username, role) {
 }
 
 export async function resetPassword(username) {
-  const res = await fetch(`${API_BASE}/users/${username}/reset-password`, {
+  const res = await authFetch(`${API_BASE}/users/${username}/reset-password`, {
     method: 'POST',
   });
   const data = await res.json();
@@ -73,7 +158,7 @@ export async function resetPassword(username) {
 }
 
 export async function deleteUser(username) {
-  const res = await fetch(`${API_BASE}/users/${username}`, {
+  const res = await authFetch(`${API_BASE}/users/${username}`, {
     method: 'DELETE',
   });
   const data = await res.json();
@@ -83,8 +168,12 @@ export async function deleteUser(username) {
   return data;
 }
 
+// ==========================================
+// SETTINGS & EMAIL (ADMIN ONLY)
+// ==========================================
+
 export async function getSettings() {
-  const res = await fetch(`${API_BASE}/settings`);
+  const res = await authFetch(`${API_BASE}/settings`);
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.detail || 'Error al cargar configuraciones');
@@ -93,7 +182,7 @@ export async function getSettings() {
 }
 
 export async function saveSettings(settingsData) {
-  const res = await fetch(`${API_BASE}/settings`, {
+  const res = await authFetch(`${API_BASE}/settings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(settingsData),
@@ -106,7 +195,7 @@ export async function saveSettings(settingsData) {
 }
 
 export async function testEmailConnection(recipient) {
-  const res = await fetch(`${API_BASE}/test-email`, {
+  const res = await authFetch(`${API_BASE}/test-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ recipient }),
@@ -118,30 +207,122 @@ export async function testEmailConnection(recipient) {
   return data;
 }
 
+// ==========================================
+// RECORDS & OFFLINE QUEUE RESILIENCE
+// ==========================================
+
+export function getOfflineQueue() {
+  try {
+    const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function saveToOfflineQueue(recordData) {
+  try {
+    const queue = getOfflineQueue();
+    queue.push({
+      id: `offline-${Date.now()}`,
+      data: recordData,
+      queuedAt: new Date().toISOString(),
+    });
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+    window.dispatchEvent(new CustomEvent('lnet-offline-queue-updated'));
+  } catch (e) {
+    console.error('Error guardando en cola offline:', e);
+  }
+}
+
+export async function syncPendingOfflineRecords() {
+  const queue = getOfflineQueue();
+  if (!queue || queue.length === 0) return { synced: 0, failed: 0 };
+
+  const remaining = [];
+  let syncedCount = 0;
+
+  for (const item of queue) {
+    try {
+      const res = await authFetch(`${API_BASE}/records`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item.data),
+      });
+      if (res.ok) {
+        syncedCount++;
+      } else {
+        remaining.push(item);
+      }
+    } catch (err) {
+      remaining.push(item);
+    }
+  }
+
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
+  window.dispatchEvent(new CustomEvent('lnet-offline-queue-updated'));
+  return { synced: syncedCount, remaining: remaining.length };
+}
+
+// Escucha reconexión para sincronizar en segundo plano
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    syncPendingOfflineRecords().then((res) => {
+      if (res.synced > 0) {
+        console.log(`[LNet Offline] ${res.synced} planilla(s) sincronizada(s) con éxito tras recuperar conexión.`);
+      }
+    });
+  });
+}
+
 export async function saveRecord(recordData, files = []) {
+  // Si no hay conexión de red, guardar en cola local
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    saveToOfflineQueue(recordData);
+    return {
+      offline: true,
+      message: 'Sin conexión a internet. La planilla fue guardada en el dispositivo y se sincronizará automáticamente al volver a tener red.',
+      record: recordData,
+    };
+  }
+
   let res;
-  if (files && files.length > 0) {
-    const formData = new FormData();
-    formData.append('data', JSON.stringify(recordData));
-    files.forEach((file) => {
-      formData.append('files', file);
-    });
-    res = await fetch(`${API_BASE}/records`, {
-      method: 'POST',
-      body: formData,
-    });
-  } else {
-    res = await fetch(`${API_BASE}/records`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(recordData),
-    });
+  try {
+    if (files && files.length > 0) {
+      const formData = new FormData();
+      formData.append('data', JSON.stringify(recordData));
+      files.forEach((file) => {
+        formData.append('files', file);
+      });
+      res = await authFetch(`${API_BASE}/records`, {
+        method: 'POST',
+        body: formData,
+      });
+    } else {
+      res = await authFetch(`${API_BASE}/records`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(recordData),
+      });
+    }
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'Error al guardar registro');
+    }
+    return data;
+  } catch (err) {
+    // Si falló por error de red / corte inesperado
+    if (err.message && (err.message.includes('fetch') || err.message.includes('NetworkError'))) {
+      saveToOfflineQueue(recordData);
+      return {
+        offline: true,
+        message: 'Conexión inestable detectada. La planilla fue guardada localmente y se subirá tan pronto regrese la red.',
+        record: recordData,
+      };
+    }
+    throw err;
   }
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.detail || 'Error al guardar registro');
-  }
-  return data;
 }
 
 export function getAttachmentUrl(path) {
@@ -153,9 +334,15 @@ export function getAttachmentUrl(path) {
   return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
-export async function getRecords(username = null) {
-  const url = username ? `${API_BASE}/records?username=${encodeURIComponent(username)}` : `${API_BASE}/records`;
-  const res = await fetch(url);
+export async function getRecords(username = null, startDate = null, endDate = null) {
+  const params = new URLSearchParams();
+  if (username) params.append('username', username);
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const url = `${API_BASE}/records${query}`;
+  const res = await authFetch(url);
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.detail || 'Error al cargar historial de registros');
@@ -163,10 +350,27 @@ export async function getRecords(username = null) {
   return data;
 }
 
-export function downloadRecordsExcel(username = null, recordId = null) {
+export function downloadRecordsExcel(username = null, recordId = null, startDate = null, endDate = null) {
   let url = `${API_BASE}/records/export/excel`;
   const params = new URLSearchParams();
   if (recordId) params.append('record_id', recordId);
+  if (username) params.append('username', username);
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+  if (params.toString()) url += `?${params.toString()}`;
+  window.open(url, '_blank');
+}
+
+export function downloadNetunoIndividualExcel(recordId) {
+  const url = `${API_BASE}/records/${encodeURIComponent(recordId)}/export/netuno-individual`;
+  window.open(url, '_blank');
+}
+
+export function downloadNetunoRelacionExcel(startDate = null, endDate = null, username = null) {
+  let url = `${API_BASE}/records/export/netuno-relacion`;
+  const params = new URLSearchParams();
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
   if (username) params.append('username', username);
   if (params.toString()) url += `?${params.toString()}`;
   window.open(url, '_blank');
@@ -177,8 +381,9 @@ export function openRecordPdf(recordId, autoPrint = false) {
   window.open(url, '_blank');
 }
 
+
 export async function resendRecordEmail(recordId, recipientEmail) {
-  const res = await fetch(`${API_BASE}/records/${recordId}/resend`, {
+  const res = await authFetch(`${API_BASE}/records/${recordId}/resend`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ recipient_email: recipientEmail }),
@@ -191,7 +396,7 @@ export async function resendRecordEmail(recordId, recipientEmail) {
 }
 
 export async function getNotifications() {
-  const res = await fetch(`${API_BASE}/notifications`);
+  const res = await authFetch(`${API_BASE}/notifications`);
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.detail || 'Error al cargar notificaciones');
@@ -200,7 +405,7 @@ export async function getNotifications() {
 }
 
 export async function markNotificationsRead(username, notificationId = null, markAll = false) {
-  const res = await fetch(`${API_BASE}/notifications/mark-read`, {
+  const res = await authFetch(`${API_BASE}/notifications/mark-read`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -217,7 +422,7 @@ export async function markNotificationsRead(username, notificationId = null, mar
 }
 
 export async function clearNotifications() {
-  const res = await fetch(`${API_BASE}/notifications`, {
+  const res = await authFetch(`${API_BASE}/notifications`, {
     method: 'DELETE',
   });
   const data = await res.json();
@@ -232,7 +437,7 @@ export async function clearNotifications() {
 // ==========================================
 
 export async function getInventory() {
-  const res = await fetch(`${API_BASE}/inventory`);
+  const res = await authFetch(`${API_BASE}/inventory`);
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.detail || 'Error al cargar inventario');
@@ -241,7 +446,7 @@ export async function getInventory() {
 }
 
 export async function createInventoryItem(itemData) {
-  const res = await fetch(`${API_BASE}/inventory/items`, {
+  const res = await authFetch(`${API_BASE}/inventory/items`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(itemData),
@@ -254,7 +459,7 @@ export async function createInventoryItem(itemData) {
 }
 
 export async function updateInventoryItem(itemId, itemData) {
-  const res = await fetch(`${API_BASE}/inventory/items/${itemId}`, {
+  const res = await authFetch(`${API_BASE}/inventory/items/${itemId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(itemData),
@@ -267,7 +472,7 @@ export async function updateInventoryItem(itemId, itemData) {
 }
 
 export async function deleteInventoryItem(itemId) {
-  const res = await fetch(`${API_BASE}/inventory/items/${itemId}`, {
+  const res = await authFetch(`${API_BASE}/inventory/items/${itemId}`, {
     method: 'DELETE',
   });
   const data = await res.json();
@@ -278,7 +483,7 @@ export async function deleteInventoryItem(itemId) {
 }
 
 export async function adjustInventoryStock(adjustData) {
-  const res = await fetch(`${API_BASE}/inventory/adjust`, {
+  const res = await authFetch(`${API_BASE}/inventory/adjust`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(adjustData),
@@ -291,7 +496,7 @@ export async function adjustInventoryStock(adjustData) {
 }
 
 export async function getInventoryMovements(limit = 150) {
-  const res = await fetch(`${API_BASE}/inventory/movements?limit=${limit}`);
+  const res = await authFetch(`${API_BASE}/inventory/movements?limit=${limit}`);
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.detail || 'Error al cargar movimientos de inventario');

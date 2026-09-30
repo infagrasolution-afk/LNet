@@ -43,12 +43,94 @@ def load_users() -> List[Dict[str, Any]]:
     conn.close()
     return [dict(row) for row in rows]
 
-def save_users(users: List[Dict[str, Any]]):
-    """Sincroniza la lista de usuarios con la base de datos SQLite."""
+def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
+    """Obtiene un usuario de forma atómica y segura por su nombre de usuario."""
     ensure_data_dir()
     conn = database.get_db_connection()
     cursor = conn.cursor()
-    # Usar upsert para cada usuario
+    cursor.execute(
+        "SELECT id, name, cedula, username, password, role, status, created_at FROM users WHERE lower(username) = ? LIMIT 1;",
+        (username.lower().strip(),)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def create_user_direct(user: Dict[str, Any]) -> Dict[str, Any]:
+    """Inserta un nuevo usuario atómicamente en la base de datos."""
+    ensure_data_dir()
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO users (id, name, cedula, username, password, role, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    """, (
+        user.get("id") or str(uuid.uuid4()),
+        user["name"].strip(),
+        user["cedula"].strip(),
+        user["username"].lower().strip(),
+        user["password"],
+        user.get("role", "user"),
+        user.get("status", "activo"),
+        user.get("created_at") or datetime.now().isoformat()
+    ))
+    conn.commit()
+    conn.close()
+    return user
+
+def update_user_password(username: str, hashed_password: str):
+    """Actualiza la contraseña de un usuario."""
+    ensure_data_dir()
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET password = ? WHERE lower(username) = ?;",
+        (hashed_password, username.lower().strip())
+    )
+    conn.commit()
+    conn.close()
+
+def update_user_status_direct(username: str, status: str):
+    """Actualiza el estado de un usuario (activo / bloqueado)."""
+    ensure_data_dir()
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET status = ? WHERE lower(username) = ?;",
+        (status, username.lower().strip())
+    )
+    conn.commit()
+    conn.close()
+
+def update_user_role_direct(username: str, role: str):
+    """Actualiza el rol de un usuario (admin / user)."""
+    ensure_data_dir()
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET role = ? WHERE lower(username) = ?;",
+        (role, username.lower().strip())
+    )
+    conn.commit()
+    conn.close()
+
+def delete_user_direct(username: str):
+    """Elimina un usuario por su nombre de usuario de forma segura."""
+    ensure_data_dir()
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM users WHERE lower(username) = ?;", (username.lower().strip(),))
+    conn.commit()
+    conn.close()
+
+def save_users(users: List[Dict[str, Any]]):
+    """
+    Sincroniza la lista de usuarios con la base de datos SQLite sin borrado masivo accidental.
+    Usa INSERT OR REPLACE / ON CONFLICT para proteger la integridad de los datos existentes.
+    """
+    ensure_data_dir()
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
     for u in users:
         cursor.execute("""
             INSERT INTO users (id, name, cedula, username, password, role, status, created_at)
@@ -69,40 +151,56 @@ def save_users(users: List[Dict[str, Any]]):
             u.get("status", "activo"),
             u.get("created_at") or datetime.now().isoformat()
         ))
-    
-    # Eliminar los usuarios que ya no estén en la lista
-    current_usernames = [u["username"].lower().strip() for u in users]
-    if current_usernames:
-        placeholders = ",".join(["?"] * len(current_usernames))
-        cursor.execute(f"DELETE FROM users WHERE lower(username) NOT IN ({placeholders});", current_usernames)
-    
     conn.commit()
     conn.close()
+
+def check_solicitud_exists(solicitud_num: str) -> bool:
+    """Verifica si un número de solicitud ya está registrado en la base de datos."""
+    ensure_data_dir()
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT 1 FROM records WHERE lower(trim(solicitud_num)) = lower(trim(?)) LIMIT 1;",
+        (str(solicitud_num).strip(),)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return bool(row)
 
 # ==========================================
 # REGISTROS / PLANILLAS
 # ==========================================
 
-def load_records(username: Optional[str] = None) -> List[Dict[str, Any]]:
+
+def load_records(
+    username: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+) -> List[Dict[str, Any]]:
     ensure_data_dir()
     conn = database.get_db_connection()
     cursor = conn.cursor()
+
+    query = """
+        SELECT id, solicitud_num, client_name, activities_json, observations,
+               created_by, created_at, email_status, attachments_json,
+               gps_lat, gps_lng, gps_accuracy, signature_data
+        FROM records
+        WHERE 1=1
+    """
+    params = []
     if username:
-        cursor.execute("""
-            SELECT id, solicitud_num, client_name, activities_json, observations,
-                   created_by, created_at, email_status, attachments_json,
-                   gps_lat, gps_lng, gps_accuracy, signature_data
-            FROM records WHERE lower(created_by) = ?
-            ORDER BY created_at DESC;
-        """, (username.lower().strip(),))
-    else:
-        cursor.execute("""
-            SELECT id, solicitud_num, client_name, activities_json, observations,
-                   created_by, created_at, email_status, attachments_json,
-                   gps_lat, gps_lng, gps_accuracy, signature_data
-            FROM records
-            ORDER BY created_at DESC;
-        """)
+        query += " AND lower(created_by) = ?"
+        params.append(username.lower().strip())
+    if start_date:
+        query += " AND substr(created_at, 1, 10) >= ?"
+        params.append(start_date.strip())
+    if end_date:
+        query += " AND substr(created_at, 1, 10) <= ?"
+        params.append(end_date.strip())
+
+    query += " ORDER BY created_at DESC;"
+    cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
 
@@ -526,14 +624,28 @@ def deduct_inventory_for_record(activities: List[Dict[str, Any]], solicitud_num:
         if qty <= 0:
             qty = 1.0
 
-        # Buscar ítem de inventario coincidente por ID o por Código/Nombre
+        # Buscar ítem de inventario coincidente:
         matched_item = None
+        inv_id = act.get("inventory_id") or act.get("id")
+        inv_code = str(act.get("code", "")).strip().upper()
+
+        # 1. Coincidencia exacta por ID de inventario o código de material
         for item in all_inventory:
-            if item["id"] == act_id or item["code"] in (act.get("description", "") or act.get("name", "")):
+            if inv_id and item["id"] == inv_id:
                 matched_item = item
                 break
+            if inv_code and item["code"].upper() == inv_code:
+                matched_item = item
+                break
+
+        # 2. Coincidencia por código embebido en descripción o nombre
+        if not matched_item:
+            for item in all_inventory:
+                if item["code"] in (act.get("description", "") or act.get("name", "")):
+                    matched_item = item
+                    break
         
-        # Si no coincidió por ID directo, buscar por palabras clave
+        # 3. Coincidencia por palabras clave
         if not matched_item:
             act_text = f"{act.get('name', '')} {act.get('description', '')}".lower()
             for item in all_inventory:
